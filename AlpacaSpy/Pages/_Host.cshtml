@@ -1,0 +1,9 @@
+@page "/"
+@namespace AlpacaSpy.Pages
+@using AlpacaSpy
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = "_Layout";
+}
+
+<component type="typeof(App)" render-mode="ServerPrerendered" />

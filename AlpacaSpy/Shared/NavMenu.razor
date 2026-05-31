@@ -1,0 +1,187 @@
+@namespace AlpacaSpy
+
+@inject State state
+@inject Settings settings
+@inject AlpacaSpyLogger logger
+@inject DialogService DialogService
+
+@implements IDisposable
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">@Globals.APPLICATION_NAME</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+@if (state.OperationUnderway)
+{
+    <span style="color:yellow;display:flex;justify-content:center;font-weight:bold;margin-top:80px;">@state.OperationUnderwayMessage</span>
+}
+else
+{
+    <div class="sidebar-nav @NavMenuCssClass" style="flex-direction:column; height:calc(100vh - 3.5rem);" @onclick="ToggleNavMenu">
+        <nav class="flex-column">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="oi oi-home" aria-hidden="true"></span> Home
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/setup" Match="NavLinkMatch.All">
+                    <span style="color:white" class="oi oi-cog" aria-hidden="true"></span> <span style="color:yellow">Setup</span>
+                </NavLink>
+            </div>
+        </nav>
+
+        <div style="flex:1"></div>
+
+        <div>
+            <div style="color:white;display:flex;justify-content:center;font-weight:bold;margin-top:0px;margin-bottom:0px;">Device State</div>
+            <div style="margin-top:3px;margin-bottom:0px;display:flex;justify-content:center;" @onclick:stopPropagation>
+                <RadzenButton Click="ConnectDisconnectAsync"
+                              Text=@(state.Connected ? "Connected" : "Disconnected")
+                              Style="width:165px;margin-left:0px; margin-right:0px; border-radius:20px; text-transform:none;"
+                              ButtonStyle="@((state.Connected) ? ButtonStyle.Success : ButtonStyle.Danger)"
+                              Disabled="@(state.OperationUnderway || state.ConnectingToDevices)" />
+            </div>
+            <div style="color:white;font-size:small;justify-content:center;display:flex;margin-top:2px;margin-bottom:48px;">Click to change state</div>
+
+            @if (state.DisplayRestartMessage)
+            {
+                <div>
+                    <span style="color:yellow;display:flex;justify-content:center;font-weight:bold;margin-top:48px;margin-bottom:12px;">Restart Required</span>
+                </div>
+            }
+        </div>
+
+        <div style="flex:6"></div>
+
+        <div style="color:white;display:flex;justify-content:center;font-weight:bold;margin-top:0px;margin-bottom:0px;">Application</div>
+        <div style="margin-top:3px;margin-bottom:12px;display:flex;justify-content:center;" @onclick:stopPropagation>
+            <RadzenButton Click="RestartApplicationAsync"
+                          Text="Restart"
+                          Style="width:165px;margin-left:0px; margin-right:0px; border-radius:20px; text-transform:none;"
+                          ButtonStyle="ButtonStyle.Warning"
+                          Disabled="@(state.OperationUnderway)" />
+        </div>
+        <div style="margin-top:0px;margin-bottom:12px;display:flex;justify-content:center;" @onclick:stopPropagation>
+            <RadzenButton Click="ShutdownApplicationAsync"
+                          Text="Shutdown"
+                          Style="width:165px;margin-left:0px; margin-right:0px; border-radius:20px; text-transform:none;"
+                          ButtonStyle="ButtonStyle.Danger"
+                          Disabled="@(state.OperationUnderway)" />
+        </div>
+    </div>
+}
+
+@code {
+    private bool collapseNavMenu = true;
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override void OnInitialized()
+    {
+        state.StateChanged += OnStateChanged;
+        settings.ConfigurationChanged += OnStateChanged;
+    }
+
+    private async void OnStateChanged(object? sender, EventArgs e)
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"NavMenu.OnStateChanged exception: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        state.StateChanged -= OnStateChanged;
+        settings.ConfigurationChanged -= OnStateChanged;
+    }
+
+    private async Task ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ConnectDisconnectAsync()
+    {
+        try
+        {
+            state.OperationUnderway = true;
+            await ConnectionManager.ChangeConnectedStateAsync(state, settings, logger, () => InvokeAsync(StateHasChanged));
+        }
+        finally
+        {
+            state.OperationUnderway = false;
+        }
+    }
+
+    private async Task RestartApplicationAsync()
+    {
+        bool? confirmed = await DialogService.Confirm(
+            "Restart the application?",
+            "Confirm Restart",
+            new ConfirmOptions { OkButtonText = "Restart", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await Task.Run(() =>
+            {
+                state.OperationUnderwayMessage = "Restarting application...";
+                logger.LogBlankLine();
+                logger.LogWarning("Restarting", "Application restart initiated.");
+                logger.LogBlankLine();
+                state.OperationUnderway = true;
+
+                if (state.Connected)
+                {
+                    ConnectionManager.Disconnect(state, logger);
+                }
+
+                Task.Delay(Globals.LOG_REFRESH_INTERVAL + 50).Wait();
+                Program.RestartRequested = true;
+                Program.applicationLifetime?.StopApplication();
+            });
+        }
+    }
+
+    private async Task ShutdownApplicationAsync()
+    {
+        bool? confirmed = await DialogService.Confirm(
+            "Shutdown the application?",
+            "Confirm Shutdown",
+            new ConfirmOptions { OkButtonText = "Shutdown", CancelButtonText = "Cancel" });
+
+        if (confirmed == true)
+        {
+            await Task.Run(() =>
+            {
+                state.OperationUnderwayMessage = "Shutting down...";
+                logger.LogBlankLine();
+                logger.LogWarning("Shutdown", "Application shutdown initiated.");
+                logger.LogBlankLine();
+                state.OperationUnderway = true;
+
+                if (state.Connected)
+                {
+                    ConnectionManager.Disconnect(state, logger);
+                }
+
+                Task.Delay(Globals.LOG_REFRESH_INTERVAL + 50).Wait();
+                Program.RestartRequested = false;
+                Program.applicationLifetime?.StopApplication();
+            });
+        }
+    }
+}

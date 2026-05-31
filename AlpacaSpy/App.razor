@@ -1,0 +1,71 @@
+@namespace AlpacaSpy
+
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <p role="alert">Sorry, there's nothing at this address.</p>
+        </LayoutView>
+    </NotFound>
+</Router>
+<HeadContent>
+    <RadzenTheme Theme="standard" />
+</HeadContent>
+
+<script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
+
+<script>
+    var dotNetHelperIndexPage;
+
+    function onResizeIndex() {
+        if (dotNetHelperIndexPage) {
+            dotNetHelperIndexPage.invokeMethodAsync('OnResizeIndex', window.innerWidth, window.innerHeight);
+        }
+    }
+
+    window.registerIndexViewportChangeCallback = (dotnetHelperObject) => {
+        window.addEventListener('load', onResizeIndex);
+        window.addEventListener('resize', onResizeIndex);
+        window.dotNetHelperIndexPage = dotnetHelperObject;
+    }
+
+    window.unregisterIndexViewportChangeCallback = () => {
+        window.removeEventListener('load', onResizeIndex);
+        window.removeEventListener('resize', onResizeIndex);
+        window.dotNetHelperIndexPage = null;
+    }
+
+    var dotNetHelperSetupPage;
+
+    function onResizeSetup() {
+        if (dotNetHelperSetupPage) {
+            dotNetHelperSetupPage.invokeMethodAsync('OnResizeSetup', window.innerWidth, window.innerHeight);
+        }
+    }
+
+    window.registerSetupViewportChangeCallback = (dotnetHelperObject) => {
+        window.addEventListener('load', onResizeSetup);
+        window.addEventListener('resize', onResizeSetup);
+        window.dotNetHelperSetupPage = dotnetHelperObject;
+    }
+
+    window.unregisterSetupViewportChangeCallback = () => {
+        window.removeEventListener('load', onResizeSetup);
+        window.removeEventListener('resize', onResizeSetup);
+        window.dotNetHelperSetupPage = null;
+    }
+
+    function ScrollToBottom(elementId) {
+        const element = document.getElementById(elementId);
+        if (!element) {
+            return 0;
+        }
+        let top = element.scrollHeight;
+        element.scrollTop = top;
+        return top;
+    };
+</script>

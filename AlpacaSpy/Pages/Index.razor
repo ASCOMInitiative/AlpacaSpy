@@ -1,0 +1,189 @@
+@page "/"
+@inject State state
+@inject AlpacaSpyLogger logger
+@inject IJSRuntime JSRuntime
+@inject Settings settings
+
+@implements IAsyncDisposable
+
+<PageTitle>@Globals.APPLICATION_NAME</PageTitle>
+
+<div>
+    @settings.Status
+    <p />
+</div>
+
+<div style="margin-bottom:8px;">
+    <RadzenButton Click="ConnectDisconnectAsync"
+                  Text=@(state.Connected ? "Connected - Click to Disconnect" : "Disconnected - Click to Connect")
+                  Style="width:280px;border-radius:20px;text-transform:none;"
+                  ButtonStyle="@(state.Connected ? ButtonStyle.Success : ButtonStyle.Danger)"
+                  Disabled="@(state.OperationUnderway || state.ConnectingToDevices)" />
+</div>
+
+<div style="height: calc(100vh - 11rem); min-height: 200px;">
+    <RadzenTextArea Id="AlpacaSpyLog"
+                    Style='font-family: "Lucida Console", "Courier New", monospace; font-size: 14px; line-height: 18px; padding-bottom: 0px; width:100%; height:100%;'
+                    Name="AlpacaSpyLog"
+                    @bind-Value=@ApplicationLog
+                    Cols="250" ReadOnly=true />
+</div>
+
+@code
+{
+    private bool _disposed;
+    private bool _logContentChanged;
+    private int _lastLogLength;
+    private string _cachedLogText = string.Empty;
+    private readonly CancellationTokenSource _cts = new();
+    private DotNetObjectReference<Index>? objRef;
+
+    protected override void OnInitialized()
+    {
+        state.StateChanged += OnStateChanged;
+        settings.ConfigurationChanged += OnStateChanged;
+
+        lock (Globals.writeLogLock)
+        {
+            _cachedLogText = state.ApplicationLog.ToString();
+        }
+        _lastLogLength = state.ApplicationLog.Length;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("window.registerIndexViewportChangeCallback", objRef);
+
+            int logWidth = await JSRuntime.InvokeAsync<int>("eval", "window.innerWidth");
+            int logHeight = await JSRuntime.InvokeAsync<int>("eval", "window.innerHeight");
+            await OnResizeIndex(logWidth, logHeight);
+
+            logger.LogBlankLine();
+            await JSRuntime.InvokeVoidAsync("ScrollToBottom", "AlpacaSpyLog");
+            _ = LogRefreshLoopAsync(_cts.Token);
+        }
+
+        if (_logContentChanged)
+        {
+            _logContentChanged = false;
+            await JSRuntime.InvokeVoidAsync("ScrollToBottom", "AlpacaSpyLog");
+        }
+    }
+
+    private async Task ConnectDisconnectAsync()
+    {
+        try
+        {
+            state.OperationUnderway = true;
+            await ConnectionManager.ChangeConnectedStateAsync(state, settings, logger, () => InvokeAsync(StateHasChanged));
+        }
+        finally
+        {
+            state.OperationUnderway = false;
+        }
+    }
+
+    private async Task LogRefreshLoopAsync(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(Globals.LOG_REFRESH_INTERVAL, token);
+
+                int currentLength = state.ApplicationLog.Length;
+                if (currentLength != _lastLogLength)
+                {
+                    _lastLogLength = currentLength;
+                    lock (Globals.writeLogLock)
+                    {
+                        _cachedLogText = state.ApplicationLog.ToString();
+                    }
+                    _logContentChanged = true;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
+    private string ApplicationLog
+    {
+        get => _cachedLogText;
+        set
+        {
+        }
+    }
+
+    private async void OnStateChanged(object? sender, EventArgs e)
+    {
+        if (_disposed)
+            return;
+
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception ex)
+        {
+            LogConsole(ex.Message);
+        }
+    }
+
+    private void LogConsole(string message)
+    {
+        lock (Globals.writeLogLock)
+        {
+            Console.Write(DateTime.Now.ToString("HH:mm:ss.fff"));
+            Console.ForegroundColor = ConsoleColor.DarkCyan;
+            Console.WriteLine(message);
+            Console.ResetColor();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnResizeIndex(int width, int height)
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+            await JSRuntime.InvokeVoidAsync("ScrollToBottom", "AlpacaSpyLog");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("OnResize", $"Exception - {ex.Message}\r\n{ex}");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _cts.Cancel();
+        _cts.Dispose();
+        state.StateChanged -= OnStateChanged;
+        settings.ConfigurationChanged -= OnStateChanged;
+
+        if (objRef != null)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("window.unregisterIndexViewportChangeCallback");
+            }
+            catch
+            {
+            }
+            objRef.Dispose();
+        }
+    }
+}

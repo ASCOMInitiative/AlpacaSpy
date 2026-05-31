@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0-alpha</InformationalVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\AlpacaSpy.xml</DocumentationFile>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ASCOM.Alpaca.Components" Version="4.0.0-rc.1" />
+    <PackageReference Include="ASCOM.Alpaca.Razor" Version="0.6.0-alpha02" />
+    <PackageReference Include="ASCOM.Tools" Version="4.0.0-rc.1" />
+    <PackageReference Include="Radzen.Blazor" Version="10.3.2" />
+  </ItemGroup>
+
+</Project>

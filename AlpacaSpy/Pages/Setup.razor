@@ -1,0 +1,207 @@
+@page "/setup"
+@inject State state
+@inject Settings settings
+@inject AlpacaSpyLogger logger
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>@Globals.APPLICATION_NAME - Setup</PageTitle>
+
+<h3>Device Discovery and Configuration</h3>
+
+<p>@state.StatusText</p>
+
+<div style="margin-bottom:16px;">
+    <RadzenButton Click="RunDiscoveryAsync"
+                  Text="Discover Alpaca Devices"
+                  ButtonStyle="ButtonStyle.Primary"
+                  Disabled="@(_discoveryRunning || state.Connected)" />
+    @if (_discoveryRunning)
+    {
+        <span style="margin-left:12px;">Discovering...</span>
+    }
+</div>
+
+@if (state.DiscoveredDevices.Any())
+{
+    <h4>Discovered Devices</h4>
+    <RadzenDataGrid Data="@state.DiscoveredDevices" TItem="ASCOM.Alpaca.Discovery.AscomDevice" AllowPaging="false">
+        <Columns>
+            <RadzenDataGridColumn TItem="ASCOM.Alpaca.Discovery.AscomDevice" Property="AscomDeviceName" Title="Name" Width="200px" />
+            <RadzenDataGridColumn TItem="ASCOM.Alpaca.Discovery.AscomDevice" Property="AscomDeviceType" Title="Type" Width="120px" />
+            <RadzenDataGridColumn TItem="ASCOM.Alpaca.Discovery.AscomDevice" Property="IpAddress" Title="IP Address" Width="140px" />
+            <RadzenDataGridColumn TItem="ASCOM.Alpaca.Discovery.AscomDevice" Property="IpPort" Title="Port" Width="80px" />
+            <RadzenDataGridColumn TItem="ASCOM.Alpaca.Discovery.AscomDevice" Title="Actions" Width="120px">
+                <Template Context="device">
+                    <RadzenButton Click="@(() => AddDevice(device))"
+                                  Text="Add"
+                                  ButtonStyle="ButtonStyle.Secondary"
+                                  Size="ButtonSize.Small"
+                                  Disabled="@(settings.ConfiguredDevices.Count >= Globals.MAX_CONFIGURED_DEVICES || state.Connected)" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+<h4 style="margin-top:24px;">Configured Proxy Devices (@settings.ConfiguredDevices.Count / @Globals.MAX_CONFIGURED_DEVICES)</h4>
+@if (!settings.ConfiguredDevices.Any())
+{
+    <p style="color:gray;">No devices configured. Discover and add devices above.</p>
+}
+else
+{
+    @foreach (var device in settings.ConfiguredDevices)
+    {
+        <div style="border:1px solid #ccc;padding:12px;margin-bottom:8px;border-radius:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong>@device.Name (@device.DeviceType)</strong>
+                <RadzenButton Click="@(() => RemoveDevice(device))"
+                              Text="Remove"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Size="ButtonSize.Small"
+                              Disabled="@state.Connected" />
+            </div>
+            <div style="color:gray;font-size:small;">@device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber → Proxy device @device.ProxyDeviceNumber</div>
+            <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                <RadzenCheckBox @bind-Value="device.LogClientHeaders" Name="@($"lch_{device.UniqueId}")" />
+                <label>Log client headers</label>
+                <RadzenCheckBox @bind-Value="device.LogClientQueryParams" Name="@($"lcq_{device.UniqueId}")" />
+                <label>Log client query params</label>
+                <RadzenCheckBox @bind-Value="device.LogClientBody" Name="@($"lcb_{device.UniqueId}")" />
+                <label>Log client body</label>
+                <RadzenCheckBox @bind-Value="device.LogDeviceHeaders" Name="@($"ldh_{device.UniqueId}")" />
+                <label>Log device headers</label>
+                <RadzenCheckBox @bind-Value="device.LogDeviceJson" Name="@($"ldj_{device.UniqueId}")" />
+                <label>Log device JSON</label>
+            </div>
+        </div>
+    }
+}
+
+<h4 style="margin-top:24px;">Settings</h4>
+<div style="display:flex;flex-direction:column;gap:8px;max-width:400px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+        <RadzenCheckBox @bind-Value="settings.AutoConnect" Name="autoConnect" />
+        <label>Auto-connect on startup</label>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+        <label style="width:120px;">Server Port:</label>
+        <RadzenNumeric TValue="int" @bind-Value="_serverPort" Min="1024" Max="65535" Style="width:100px;" />
+    </div>
+    <div>
+        <RadzenButton Click="SaveSettings" Text="Save Settings" ButtonStyle="ButtonStyle.Primary" />
+    </div>
+</div>
+
+@code {
+    private bool _discoveryRunning;
+    private int _serverPort;
+
+    protected override void OnInitialized()
+    {
+        _serverPort = settings.ServerPort;
+        state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
+        state.StateChanged += OnStateChanged;
+        settings.ConfigurationChanged += OnStateChanged;
+    }
+
+    private async Task RunDiscoveryAsync()
+    {
+        _discoveryRunning = true;
+        state.StatusText = "Discovery running...";
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            var devices = await ASCOM.Alpaca.Discovery.AlpacaDiscovery.GetAscomDevicesAsync(null, 1, 100, 32227, settings.AlpacaDiscoveryDuration, false, true, false, ASCOM.Common.Alpaca.ServiceType.Http, logger, CancellationToken.None);
+            lock (state.DiscoveredDevicesLock)
+            {
+                state.DiscoveredDevices.Clear();
+                state.DiscoveredDevices.AddRange(devices);
+            }
+            state.DiscoveryHasRun = true;
+            state.StatusText = $"Found {state.DiscoveredDevices.Count} device(s) at {DateTime.Now:HH:mm:ss}.";
+            logger.LogMessage("Discovery", $"Found {state.DiscoveredDevices.Count} Alpaca device(s).");
+        }
+        catch (Exception ex)
+        {
+            state.StatusText = $"Discovery error: {ex.Message}";
+            logger.LogError("Discovery", $"Exception: {ex.Message}");
+        }
+        finally
+        {
+            _discoveryRunning = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void AddDevice(ASCOM.Alpaca.Discovery.AscomDevice device)
+    {
+        if (settings.ConfiguredDevices.Count >= Globals.MAX_CONFIGURED_DEVICES)
+            return;
+
+        if (device.AscomDeviceType is null || !Enum.TryParse<AlpacaDeviceType>(device.AscomDeviceType.Value.ToString(), true, out var deviceType))
+            return;
+
+        int nextNumber = settings.ConfiguredDevices
+            .Where(d => d.DeviceType == deviceType)
+            .Select(d => d.ProxyDeviceNumber)
+            .DefaultIfEmpty(-1)
+            .Max() + 1;
+
+        var newDevice = new ConfiguredDevice
+        {
+            Name = device.AscomDeviceName,
+            IpAddress = device.IpAddress.ToString(),
+            PortNumber = device.IpPort,
+            RemoteDeviceNumber = device.AlpacaDeviceNumber,
+            DeviceType = deviceType,
+            ProxyDeviceNumber = nextNumber,
+            UniqueId = Guid.NewGuid().ToString()
+        };
+
+        settings.ConfiguredDevices.Add(newDevice);
+        state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
+        settings.Save();
+        state.DisplayRestartMessage = true;
+        state.StatusText = $"Added {newDevice.Name}. Restart required for changes to take effect.";
+    }
+
+    private void RemoveDevice(ConfiguredDevice device)
+    {
+        settings.ConfiguredDevices.Remove(device);
+        foreach (var type in Enum.GetValues<AlpacaDeviceType>())
+        {
+            int idx = 0;
+            foreach (var configured in settings.ConfiguredDevices.Where(d => d.DeviceType == type))
+                configured.ProxyDeviceNumber = idx++;
+        }
+        state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
+        settings.Save();
+        state.DisplayRestartMessage = true;
+        state.StatusText = $"Removed {device.Name}. Restart required for changes to take effect.";
+    }
+
+    private void SaveSettings()
+    {
+        bool restartRequired = settings.ServerPort != _serverPort;
+        settings.ServerPort = (ushort)_serverPort;
+        settings.Save();
+        if (restartRequired)
+            state.DisplayRestartMessage = true;
+        state.StatusText = $"Settings saved at {DateTime.Now:HH:mm:ss}.";
+    }
+
+    private async void OnStateChanged(object? sender, EventArgs e)
+    {
+        try { await InvokeAsync(StateHasChanged); }
+        catch (ObjectDisposedException) { }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        state.StateChanged -= OnStateChanged;
+        settings.ConfigurationChanged -= OnStateChanged;
+        return ValueTask.CompletedTask;
+    }
+}
