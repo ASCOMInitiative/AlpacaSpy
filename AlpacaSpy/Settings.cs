@@ -189,8 +189,10 @@ namespace AlpacaSpy
         {
             LogMessage(LogLevel.Debug, "Saving settings to settings file");
             EnsureDefaults();
-            PersistSettings();
-            Status = $"Settings saved at {DateTime.Now:HH:mm:ss}.";
+            bool saved = PersistSettings();
+            Status = saved
+                ? $"Settings saved at {DateTime.Now:HH:mm:ss}."
+                : $"ERROR: Settings could not be saved at {DateTime.Now:HH:mm:ss}.";
             RaiseChangeEvent();
         }
 
@@ -276,7 +278,7 @@ namespace AlpacaSpy
             }
         }
 
-        private void PersistSettings()
+        private bool PersistSettings()
         {
             try
             {
@@ -286,10 +288,12 @@ namespace AlpacaSpy
                 Directory.CreateDirectory(Path.GetDirectoryName(SettingsFileName) ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Globals.APPLICATION_FOLDER_NAME));
                 LogMessage(LogLevel.Debug, $"PersistSettings - Created directory. Writing to {SettingsFileName}");
                 File.WriteAllText(SettingsFileName, serialisedSettingsString);
+                return true;
             }
             catch (Exception ex)
             {
                 LogMessage(LogLevel.Error, $"PersistSettings exception: {ex.Message}\r\n{ex}");
+                return false;
             }
         }
 

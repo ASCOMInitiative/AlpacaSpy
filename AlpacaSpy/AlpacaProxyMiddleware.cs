@@ -114,24 +114,28 @@ namespace AlpacaSpy
                 return;
             }
 
-            // Log device → AlpacaSpy
-            LogDeviceResponse(responseMessage, responseBytes, device);
-
-            // Forward response to the original client
-            context.Response.StatusCode = (int)responseMessage.StatusCode;
-
-            foreach (var header in responseMessage.Headers)
+            // Dispose responseMessage promptly once we are done with it (fix: was previously leaked)
+            using (responseMessage)
             {
-                if (!HopByHopHeaders.Contains(header.Key))
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-            }
-            foreach (var header in responseMessage.Content.Headers)
-            {
-                if (!HopByHopHeaders.Contains(header.Key))
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-            }
+                // Log device → AlpacaSpy
+                LogDeviceResponse(responseMessage, responseBytes, device);
 
-            await context.Response.Body.WriteAsync(responseBytes);
+                // Forward response to the original client
+                context.Response.StatusCode = (int)responseMessage.StatusCode;
+
+                foreach (var header in responseMessage.Headers)
+                {
+                    if (!HopByHopHeaders.Contains(header.Key))
+                        context.Response.Headers[header.Key] = header.Value.ToArray();
+                }
+                foreach (var header in responseMessage.Content.Headers)
+                {
+                    if (!HopByHopHeaders.Contains(header.Key))
+                        context.Response.Headers[header.Key] = header.Value.ToArray();
+                }
+
+                await context.Response.Body.WriteAsync(responseBytes);
+            }
         }
 
         private static async Task<byte[]> ReadRequestBodyAsync(HttpContext context)
@@ -155,11 +159,14 @@ namespace AlpacaSpy
                 RequestUri = new Uri(targetUrl)
             };
 
+            // Collect headers rejected by HttpRequestMessage.Headers (i.e. content headers) so they
+            // can be applied to request.Content after the body is assigned — not before (fix: was null).
+            var deferredContentHeaders = new List<(string Key, string[] Values)>();
             foreach (var header in context.Request.Headers)
             {
                 if (HopByHopHeaders.Contains(header.Key)) continue;
                 if (!request.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
-                    request.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+                    deferredContentHeaders.Add((header.Key, header.Value.ToArray()));
             }
 
             if (bodyBytes.Length > 0)
@@ -168,6 +175,9 @@ namespace AlpacaSpy
                 if (!string.IsNullOrEmpty(context.Request.ContentType))
                     request.Content.Headers.ContentType =
                         System.Net.Http.Headers.MediaTypeHeaderValue.Parse(context.Request.ContentType);
+
+                foreach (var (key, values) in deferredContentHeaders)
+                    request.Content.Headers.TryAddWithoutValidation(key, values);
             }
 
             return request;

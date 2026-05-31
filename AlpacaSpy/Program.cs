@@ -136,6 +136,11 @@ namespace AlpacaSpy
                 if (settings.AutoConnect && !state.Connected)
                     Task.Run(async () =>
                     {
+                        lock (Globals.StateLock)
+                        {
+                            if (state.ConnectingToDevices) return;
+                            state.ConnectingToDevices = true;
+                        }
                         try
                         {
                             state.OperationUnderway = true;
@@ -143,6 +148,7 @@ namespace AlpacaSpy
                         }
                         finally
                         {
+                            state.ConnectingToDevices = false;
                             state.OperationUnderway = false;
                         }
                     });
