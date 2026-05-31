@@ -13,15 +13,7 @@
     <p />
 </div>
 
-<div style="margin-bottom:8px;">
-    <RadzenButton Click="ConnectDisconnectAsync"
-                  Text=@(state.Connected ? "Connected - Click to Disconnect" : "Disconnected - Click to Connect")
-                  Style="width:280px;border-radius:20px;text-transform:none;"
-                  ButtonStyle="@(state.Connected ? ButtonStyle.Success : ButtonStyle.Danger)"
-                  Disabled="@(state.OperationUnderway || state.ConnectingToDevices)" />
-</div>
-
-<div style="height: calc(100vh - 11rem); min-height: 200px;">
+<div style="height: calc(100vh - 8rem); min-height: 200px;">
     <RadzenTextArea Id="AlpacaSpyLog"
                     Style='font-family: "Lucida Console", "Courier New", monospace; font-size: 14px; line-height: 18px; padding-bottom: 0px; width:100%; height:100%;'
                     Name="AlpacaSpyLog"

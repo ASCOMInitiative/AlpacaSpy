@@ -45,7 +45,7 @@ namespace AlpacaSpy.ProxyDevices
         public string DriverInfo => Client.DriverInfo;
         public string DriverVersion => Client.DriverVersion;
         public short InterfaceVersion => Client.InterfaceVersion;
-        public string Name => _config.Name + " (AlpacaSpy)";
+        public string Name => "AlpacaSpy - " + _config.Name;
         public IList<string> SupportedActions => Client.SupportedActions;
         public void Connect() => ConnectDevice();
         public void Disconnect() => DisconnectDevice();

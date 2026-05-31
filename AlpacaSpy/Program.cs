@@ -191,7 +191,7 @@ namespace AlpacaSpy
 
             foreach (var config in settings.ConfiguredDevices)
             {
-                string proxyName = $"{config.Name} (AlpacaSpy)";
+                string proxyName = $"AlpacaSpy - {config.Name}";
                 try
                 {
                     // Create the proxy object once and register the SAME instance with both

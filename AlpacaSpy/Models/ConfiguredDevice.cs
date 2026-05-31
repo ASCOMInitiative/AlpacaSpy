@@ -14,5 +14,6 @@ namespace AlpacaSpy.Models
         public bool LogClientBody { get; set; } = true;
         public bool LogDeviceHeaders { get; set; } = true;
         public bool LogDeviceJson { get; set; } = true;
+        public bool LogJsonParameters { get; set; } = true;
     }
 }

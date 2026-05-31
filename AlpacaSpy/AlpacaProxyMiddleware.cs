@@ -195,7 +195,9 @@ namespace AlpacaSpy
 
             if (device.LogClientBody && bodyBytes.Length > 0)
             {
-                sb.AppendLine($"  BODY: {Encoding.UTF8.GetString(bodyBytes)}");
+                sb.AppendLine("  BODY PARAMETERS:");
+                foreach (var part in Encoding.UTF8.GetString(bodyBytes).Split('&'))
+                    sb.AppendLine($"    {part}");
             }
 
             WriteToLogs(device, sb.ToString().TrimEnd());
@@ -219,6 +221,24 @@ namespace AlpacaSpy
             if (device.LogDeviceJson && responseBytes.Length > 0)
             {
                 sb.AppendLine($"  DEVICE RESPONSE JSON: {Encoding.UTF8.GetString(responseBytes)}");
+            }
+
+            if (device.LogJsonParameters && responseBytes.Length > 0)
+            {
+                if (!device.LogDeviceJson && responseBytes.Length > 0)
+                {
+                    sb.AppendLine($"  DEVICE RESPONSE:");
+                }
+                try
+                {
+                    using var doc = JsonDocument.Parse(responseBytes);
+                    foreach (var prop in doc.RootElement.EnumerateObject())
+                        sb.AppendLine($"    {prop.Name}: {prop.Value}");
+                }
+                catch (JsonException ex)
+                {
+                    sb.AppendLine($"    Invalid JSON detected: {ex.Message}");
+                }
             }
 
             WriteToLogs(device, $"{sb.ToString().TrimEnd()}\r\n");
