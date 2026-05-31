@@ -1,4 +1,5 @@
 using AlpacaSpy.Models;
+using ASCOM.Tools;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -43,6 +44,9 @@ namespace AlpacaSpy
 
         public List<object> ProxyDevices { get; set; } = new();
 
+        /// <summary>Per-device TraceLogger instances keyed by ConfiguredDevice.UniqueId.</summary>
+        public Dictionary<string, TraceLogger> DeviceLoggers { get; set; } = new();
+
         public List<ASCOM.Alpaca.Discovery.AscomDevice> DiscoveredDevices { get; set; } = new();
 
         public Lock DiscoveredDevicesLock { get; } = new();
@@ -66,6 +70,8 @@ namespace AlpacaSpy
                 .Append($"{Globals.WELCOME_MESSAGE}\r\n");
             ConfiguredDevices = new List<ConfiguredDevice>();
             ProxyDevices = new List<object>();
+            foreach (var tl in DeviceLoggers.Values) try { tl.Dispose(); } catch { }
+            DeviceLoggers = new Dictionary<string, TraceLogger>();
             lock (DiscoveredDevicesLock)
             {
                 DiscoveredDevices = new List<ASCOM.Alpaca.Discovery.AscomDevice>();

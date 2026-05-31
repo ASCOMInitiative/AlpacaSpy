@@ -1,10 +1,12 @@
 using ASCOM.Alpaca;
 using ASCOM.Common;
+using ASCOM.Tools;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Radzen;
 using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 
 namespace AlpacaSpy
 {
@@ -91,6 +93,7 @@ namespace AlpacaSpy
             ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAlpacaAPIBehavoir(builder.Services);
             ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAuthentication(builder.Services);
             builder.Services.AddScoped<ASCOM.Alpaca.IUserService, Data.UserService>();
+            builder.Services.AddHttpClient("AlpacaProxy");
 
             builder.Services.AddRadzenComponents();
             builder.Services.AddScoped<PerBrowserState>();
@@ -108,6 +111,7 @@ namespace AlpacaSpy
             ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAuthentication(app);
 
             app.UseStaticFiles();
+            app.UseMiddleware<AlpacaProxyMiddleware>();
             app.UseRouting();
             app.MapBlazorHub(options =>
             {
@@ -243,6 +247,11 @@ namespace AlpacaSpy
 
                     state.ProxyDevices.Add(proxy);
                     logger.LogMessage("LoadDevices", $"Registered {proxyName} as proxy device {config.ProxyDeviceNumber}");
+
+                    // Create a per-device TraceLogger for file-based traffic logging
+                    string safeName = Regex.Replace(config.Name, @"[^\w]", "_");
+                    var deviceLogger = new TraceLogger($"AlpacaSpy.{safeName}", true);
+                    state.DeviceLoggers[config.UniqueId] = deviceLogger;
                 }
                 catch (Exception ex)
                 {

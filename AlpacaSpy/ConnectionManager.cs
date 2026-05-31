@@ -1,4 +1,4 @@
-using ASCOM.Alpaca;
+using System.Text.RegularExpressions;
 
 namespace AlpacaSpy
 {
@@ -38,33 +38,9 @@ namespace AlpacaSpy
 
         internal static void Disconnect(State state, AlpacaSpyLogger logger)
         {
-            logger.LogMessage("Disconnect", "Disconnecting from all proxy devices...");
-            try
-            {
-                foreach (var device in state.ProxyDevices)
-                {
-                    try
-                    {
-                        DisconnectProxy(device);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError("Disconnect", $"Error disconnecting device: {ex.Message}");
-                    }
-                }
-                // Do NOT clear state.ProxyDevices — DeviceManager holds the same instances
-                // and must continue to serve them for Alpaca HTTP even while disconnected.
-            }
-            catch (Exception ex)
-            {
-                logger.LogError("Disconnect", $"Exception during disconnect: {ex.Message}");
-            }
-            finally
-            {
-                logger.LogMessage("Disconnect", "All proxy devices disconnected.");
-                logger.LogBlankLine();
-                state.Connected = false;
-            }
+            logger.LogMessage("Disconnect", "Proxy monitoring stopped.");
+            logger.LogBlankLine();
+            state.Connected = false;
         }
 
         internal static async Task ConnectAsync(State state, Settings settings, AlpacaSpyLogger logger)
@@ -72,39 +48,49 @@ namespace AlpacaSpy
             await Globals.ConnectSemaphore.WaitAsync();
             try
             {
-                if (state.ProxyDevices.Count == 0)
+                var devices = state.ConfiguredDevices;
+                if (devices.Count == 0)
                 {
-                    logger.LogMessage("Connect", "No proxy devices loaded. Configure devices in Setup and restart.");
+                    logger.LogMessage("Connect", "No devices configured. Add devices in Setup and restart.");
                     return;
                 }
 
-                logger.LogMessage("Connect", $"Connecting to {state.ProxyDevices.Count} proxy device(s)...");
+                logger.LogMessage("Connect", $"Checking connectivity to {devices.Count} configured device(s)...");
                 int successCount = 0;
 
-                for (int i = 0; i < state.ProxyDevices.Count; i++)
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                foreach (var device in devices)
                 {
-                    string name = i < settings.ConfiguredDevices.Count ? settings.ConfiguredDevices[i].Name : "Unknown";
                     try
                     {
-                        logger.LogMessage("Connect", $"Connecting to {name}...");
-                        ConnectProxy(state.ProxyDevices[i]);
-                        successCount++;
-                        logger.LogMessage("Connect", $"Connected to {name}");
+                        logger.LogMessage("Connect", $"  Checking {device.Name} at {device.IpAddress}:{device.PortNumber}...");
+                        string deviceTypePath = DeviceTypePath(device.DeviceType);
+                        string url = $"http://{device.IpAddress}:{device.PortNumber}/api/v1/{deviceTypePath}/{device.RemoteDeviceNumber}/connected";
+                        var response = await httpClient.GetAsync(url);
+                        if (response.IsSuccessStatusCode)
+                        {
+                            successCount++;
+                            logger.LogMessage("Connect", $"  {device.Name}: reachable ✓");
+                        }
+                        else
+                        {
+                            logger.LogWarning("Connect", $"  {device.Name}: HTTP {(int)response.StatusCode}");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError("Connect", $"Failed to connect to {name}: {ex.Message}");
+                        logger.LogError("Connect", $"  {device.Name}: {ex.Message}");
                     }
                 }
 
                 if (successCount > 0)
                 {
                     state.Connected = true;
-                    logger.LogMessage("Connect", $"Connected to {successCount}/{state.ProxyDevices.Count} device(s).");
+                    logger.LogMessage("Connect", $"Connected — {successCount}/{devices.Count} device(s) reachable. Proxy active.");
                 }
                 else
                 {
-                    logger.LogWarning("Connect", "No devices connected successfully.");
+                    logger.LogWarning("Connect", "No devices reachable. Check device configuration.");
                 }
                 logger.LogBlankLine();
             }
@@ -114,38 +100,20 @@ namespace AlpacaSpy
             }
         }
 
-        private static void ConnectProxy(object proxy)
-        {
-            switch (proxy)
+        private static string DeviceTypePath(Models.AlpacaDeviceType deviceType) =>
+            deviceType switch
             {
-                case ProxyDevices.ProxyCamera p: p.ConnectDevice(); break;
-                case ProxyDevices.ProxyCoverCalibrator p: p.ConnectDevice(); break;
-                case ProxyDevices.ProxyDome p: p.ConnectDevice(); break;
-                case ProxyDevices.ProxyFilterWheel p: p.ConnectDevice(); break;
-                case ProxyDevices.ProxyFocuser p: p.ConnectDevice(); break;
-                case ProxyDevices.ProxyObservingConditions p: p.ConnectDevice(); break;
-                case ProxyDevices.ProxyRotator p: p.ConnectDevice(); break;
-                case ProxyDevices.ProxySafetyMonitor p: p.ConnectDevice(); break;
-                case ProxyDevices.ProxySwitch p: p.ConnectDevice(); break;
-                case ProxyDevices.ProxyTelescope p: p.ConnectDevice(); break;
-            }
-        }
-
-        private static void DisconnectProxy(object proxy)
-        {
-            switch (proxy)
-            {
-                case ProxyDevices.ProxyCamera p: p.DisconnectDevice(); break;
-                case ProxyDevices.ProxyCoverCalibrator p: p.DisconnectDevice(); break;
-                case ProxyDevices.ProxyDome p: p.DisconnectDevice(); break;
-                case ProxyDevices.ProxyFilterWheel p: p.DisconnectDevice(); break;
-                case ProxyDevices.ProxyFocuser p: p.DisconnectDevice(); break;
-                case ProxyDevices.ProxyObservingConditions p: p.DisconnectDevice(); break;
-                case ProxyDevices.ProxyRotator p: p.DisconnectDevice(); break;
-                case ProxyDevices.ProxySafetyMonitor p: p.DisconnectDevice(); break;
-                case ProxyDevices.ProxySwitch p: p.DisconnectDevice(); break;
-                case ProxyDevices.ProxyTelescope p: p.DisconnectDevice(); break;
-            }
-        }
+                Models.AlpacaDeviceType.Camera              => "camera",
+                Models.AlpacaDeviceType.CoverCalibrator     => "covercalibrator",
+                Models.AlpacaDeviceType.Dome                => "dome",
+                Models.AlpacaDeviceType.FilterWheel         => "filterwheel",
+                Models.AlpacaDeviceType.Focuser             => "focuser",
+                Models.AlpacaDeviceType.ObservingConditions => "observingconditions",
+                Models.AlpacaDeviceType.Rotator             => "rotator",
+                Models.AlpacaDeviceType.SafetyMonitor       => "safetymonitor",
+                Models.AlpacaDeviceType.Switch              => "switch",
+                Models.AlpacaDeviceType.Telescope           => "telescope",
+                _                                           => deviceType.ToString().ToLowerInvariant()
+            };
     }
 }
