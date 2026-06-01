@@ -9,11 +9,11 @@ namespace AlpacaSpy.Models
         public AlpacaDeviceType DeviceType { get; set; } = AlpacaDeviceType.Telescope;
         public int ProxyDeviceNumber { get; set; } = 0;
         public string UniqueId { get; set; } = Guid.NewGuid().ToString();
-        public bool LogClientHeaders { get; set; } = true;
-        public bool LogClientQueryParams { get; set; } = true;
+        public bool LogClientHeaders { get; set; } = false;
+        public bool LogClientQueryParams { get; set; } = false;
         public bool LogClientBody { get; set; } = true;
-        public bool LogDeviceHeaders { get; set; } = true;
+        public bool LogDeviceHeaders { get; set; } = false;
         public bool LogDeviceJson { get; set; } = true;
-        public bool LogJsonParameters { get; set; } = true;
+        public bool LogJsonParameters { get; set; } = false;
     }
 }

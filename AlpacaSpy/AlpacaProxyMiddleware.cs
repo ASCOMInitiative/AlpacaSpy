@@ -3,6 +3,7 @@ using ASCOM.Tools;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace AlpacaSpy
 {
@@ -98,14 +99,20 @@ namespace AlpacaSpy
             var client = httpClientFactory.CreateClient("AlpacaProxy");
             using HttpRequestMessage forwardRequest = BuildForwardRequest(context, targetUrl, requestBodyBytes);
 
-            foreach (var header in forwardRequest.Headers)
+            // List the headers we are sending
+            foreach (KeyValuePair<string, IEnumerable<string>> header in forwardRequest.Headers)
             {
-                logger.LogDebug("", $"Sending header {header.Key} = ");
-                foreach (var item in header.Value)
+                StringBuilder sb = new();
+                sb.Append($"Sending header {header.Key} =");
+
+                foreach (string item in header.Value)
                 {
-                    logger.LogDebug("", $"Containing value  {item}");
+                    sb.Append($" {item},");
                 }
+                logger.LogDebug("Headers", sb.ToString());
             }
+
+            // Send the message to the device and wait for its response.
             HttpResponseMessage responseMessage;
             byte[] responseBytes;
             try
@@ -120,27 +127,32 @@ namespace AlpacaSpy
                 return;
             }
 
-            // Dispose responseMessage promptly once we are done with it (fix: was previously leaked)
+            // Dispose responseMessage promptly once we are done with it 
             using (responseMessage)
             {
-                // Log device → AlpacaSpy
+                // Log device's response
                 LogDeviceResponse(responseMessage, responseBytes, device);
 
                 // Forward response to the original client
+
+                // Set the HTTP status
                 context.Response.StatusCode = (int)responseMessage.StatusCode;
 
+                // Add the response headers
                 foreach (var header in responseMessage.Headers)
                 {
                     if (!HopByHopHeaders.Contains(header.Key))
                         context.Response.Headers[header.Key] = header.Value.ToArray();
                 }
+
+                // Add response content headers
                 foreach (var header in responseMessage.Content.Headers)
                 {
                     if (!HopByHopHeaders.Contains(header.Key))
                         context.Response.Headers[header.Key] = header.Value.ToArray();
                 }
 
-
+                // Send the response to the client.
                 await context.Response.Body.WriteAsync(responseBytes);
             }
         }
@@ -207,9 +219,10 @@ namespace AlpacaSpy
 
             if (device.LogClientBody && bodyBytes.Length > 0)
             {
-                sb.AppendLine("  BODY PARAMETERS:");
+                sb.Append("  BODY PARAMETERS:");
                 foreach (var part in Encoding.UTF8.GetString(bodyBytes).Split('&'))
-                    sb.AppendLine($"    {part}");
+                    sb.Append($" {part},");
+                sb.AppendLine();
             }
 
             WriteToLogs(device, sb.ToString().TrimEnd());
@@ -217,8 +230,38 @@ namespace AlpacaSpy
 
         private void LogDeviceResponse(HttpResponseMessage response, byte[] responseBytes, ConfiguredDevice device)
         {
+            string? contentType = response.Content.Headers.ContentType?.ToString().ToLowerInvariant();
             var sb = new StringBuilder();
-            sb.AppendLine($"◄── {(int)response.StatusCode} {response.ReasonPhrase}  [{device.Name}]");
+            sb.Append($"◄── {(int)response.StatusCode} {response.ReasonPhrase}  [{device.Name}]");
+
+            if (device.LogDeviceJson && responseBytes.Length > 0)
+            {
+                switch (contentType)
+                {
+                    case "application/json":
+                        {
+                            string text = Encoding.UTF8.GetString(responseBytes);
+                            sb.AppendLine($" JSON RESPONSE: {text[..Math.Min(150, text.Length)]}");
+                            break;
+                        }
+                    case "application/imagebytes":
+                        {
+                            sb.Append($" IMAGEBYTES RESPONSE:");
+                            for (int i = 0; i < Math.Min(50, responseBytes.Length); i++)
+                            {
+                                sb.Append($" [{responseBytes[i]:X2}]");
+                            }
+                            sb.AppendLine();
+                            break;
+                        }
+                    default:
+                        {
+                            string text = Encoding.UTF8.GetString(responseBytes);
+                            sb.AppendLine($" DEVICE RESPONSE: {text[..Math.Min(150, text.Length)]}");
+                            break;
+                        }
+                }
+            }
 
             if (device.LogDeviceHeaders)
             {
@@ -228,34 +271,6 @@ namespace AlpacaSpy
                 foreach (var h in response.Content.Headers)
                     sb.AppendLine($"    {h.Key}: {string.Join(", ", h.Value)}");
             }
-
-            string? contentType = response.Content.Headers.ContentType?.ToString().ToLowerInvariant();
-
-            if (device.LogDeviceJson && responseBytes.Length > 0)
-            {
-                switch (contentType)
-                {
-                    case "application/json":
-                        {
-                            string text = Encoding.UTF8.GetString(responseBytes);
-                            sb.AppendLine($"  DEVICE RESPONSE JSON: {text[..Math.Min(150, text.Length)]}");
-                            break;
-                        }
-                    case "application/imagebytes":
-                        {
-                            string text = Encoding.ASCII.GetString(responseBytes);
-                            sb.AppendLine($"  DEVICE RESPONSE IMAGEBYTES: {text[..Math.Min(50, text.Length)]}");
-                            break;
-                        }
-                    default:
-                        {
-                            string text = Encoding.UTF8.GetString(responseBytes);
-                            sb.AppendLine($"  DEVICE RESPONSE: {text[..Math.Min(150, text.Length)]}");
-                            break;
-                        }
-                }
-            }
-
             if (device.LogJsonParameters && responseBytes.Length > 0 && contentType != "application/imagebytes")
             {
                 if (!device.LogDeviceJson && responseBytes.Length > 0)

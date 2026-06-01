@@ -96,28 +96,36 @@ else
 <h4 style="margin-top:24px;">Settings</h4>
 <div style="display:flex;flex-direction:column;gap:8px;max-width:400px;">
     <div style="display:flex;align-items:center;gap:8px;">
-        <RadzenCheckBox @bind-Value="settings.AutoConnect" Name="autoConnect" />
+        <RadzenCheckBox TValue="bool"
+                        Value="_autoConnect"
+                        ValueChanged="@((bool v) => { _autoConnect = v; SaveSettings(); })"
+                        Name="autoConnect" />
         <label>Auto-connect on startup</label>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
         <label style="width:120px;">Server Port:</label>
-        <RadzenNumeric TValue="int" @bind-Value="_serverPort" Min="1024" Max="65535" Style="width:100px;" />
+        <RadzenNumeric TValue="int"
+                       @bind-Value="_serverPort" 
+                       Min="1024" 
+                       Max="65535" 
+                       Change="@(() => SaveSettings())"
+                       Style="width:100px;" />
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
         <label style="width:120px;">Logging Level:</label>
         <RadzenDropDown TValue="ASCOM.Common.Interfaces.LogLevel"
                         Data="@_logLevels"
                         @bind-Value="_logLevel"
-                        Style="width:180px;" />
-    </div>
-    <div>
-        <RadzenButton Click="SaveSettings" Text="Save Settings" ButtonStyle="ButtonStyle.Primary" />
+                        Style="width:180px;" 
+                        Change="@(() => SaveSettings())"
+                        />
     </div>
 </div>
 
 @code {
     private bool _discoveryRunning;
     private int _serverPort;
+    private bool _autoConnect;
     private ASCOM.Common.Interfaces.LogLevel _logLevel;
     private readonly ASCOM.Common.Interfaces.LogLevel[] _logLevels = Enum.GetValues<ASCOM.Common.Interfaces.LogLevel>();
 
@@ -125,6 +133,7 @@ else
     {
         _serverPort = settings.ServerPort;
         _logLevel = settings.LogLevel;
+        _autoConnect = settings.AutoConnect;
         state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
         state.StateChanged += OnStateChanged;
         settings.ConfigurationChanged += OnStateChanged;
@@ -209,6 +218,7 @@ else
     private void SaveSettings()
     {
         bool restartRequired = settings.ServerPort != _serverPort;
+        settings.AutoConnect = _autoConnect;
         settings.ServerPort = (ushort)_serverPort;
         settings.LogLevel = _logLevel;
         logger.SetMinimumLoggingLevel(_logLevel);
