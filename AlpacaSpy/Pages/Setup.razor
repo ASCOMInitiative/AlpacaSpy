@@ -68,22 +68,14 @@ else
                                 ValueChanged="@((bool v) => { device.LogClientHeaders = v; settings.Save(); })"
                                 Name="@($"lch_{device.UniqueId}")" />
                 <label>Log client headers</label>
-                <RadzenCheckBox Value="device.LogClientQueryParams"
-                                ValueChanged="@((bool v) => { device.LogClientQueryParams = v; settings.Save(); })"
+                <RadzenCheckBox Value="device.LogClientParams"
+                                ValueChanged="@((bool v) => { device.LogClientParams = v; settings.Save(); })"
                                 Name="@($"lcq_{device.UniqueId}")" />
-                <label>Log client query params</label>
-                <RadzenCheckBox Value="device.LogClientBody"
-                                ValueChanged="@((bool v) => { device.LogClientBody = v; settings.Save(); })"
-                                Name="@($"lcb_{device.UniqueId}")" />
-                <label>Log client body</label>
+                <label>Log client parameters</label>
                 <RadzenCheckBox Value="device.LogDeviceHeaders"
                                 ValueChanged="@((bool v) => { device.LogDeviceHeaders = v; settings.Save(); })"
                                 Name="@($"ldh_{device.UniqueId}")" />
                 <label>Log device headers</label>
-                <RadzenCheckBox Value="device.LogDeviceJson"
-                                ValueChanged="@((bool v) => { device.LogDeviceJson = v; settings.Save(); })"
-                                Name="@($"ldj_{device.UniqueId}")" />
-                <label>Log device JSON</label>
                 <RadzenCheckBox Value="device.LogJsonParameters"
                                 ValueChanged="@((bool v) => { device.LogJsonParameters = v; settings.Save(); })"
                                 Name="@($"ljp_{device.UniqueId}")" />

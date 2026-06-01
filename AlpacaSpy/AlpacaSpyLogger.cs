@@ -89,7 +89,7 @@ namespace AlpacaSpy
                                 state.ApplicationLog.Remove(0, Globals.LOG_TRUNCATION_CHARACTERS);
                                 int newLength = state.ApplicationLog.Length;
                                 state.ApplicationLog.Insert(0, $"\r\n**** {ex.Message} Log truncated at {DateTime.Now:HH:mm:ss.fff} original length: {originalLength}, new length: {newLength} ****\r\n");
-                                state.ApplicationLog.Append($"\r\n{formattedMessage}");
+                                state.ApplicationLog.Append($"{formattedMessage}");
                             }
 
                             OnMessageLogChanged(formattedMessage);

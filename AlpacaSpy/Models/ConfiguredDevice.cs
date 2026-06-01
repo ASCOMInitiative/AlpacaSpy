@@ -10,10 +10,8 @@ namespace AlpacaSpy.Models
         public int ProxyDeviceNumber { get; set; } = 0;
         public string UniqueId { get; set; } = Guid.NewGuid().ToString();
         public bool LogClientHeaders { get; set; } = false;
-        public bool LogClientQueryParams { get; set; } = false;
-        public bool LogClientBody { get; set; } = true;
+        public bool LogClientParams { get; set; } = false;
         public bool LogDeviceHeaders { get; set; } = false;
-        public bool LogDeviceJson { get; set; } = true;
         public bool LogJsonParameters { get; set; } = false;
     }
 }
