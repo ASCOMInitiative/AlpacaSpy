@@ -103,6 +103,13 @@ else
         <label style="width:120px;">Server Port:</label>
         <RadzenNumeric TValue="int" @bind-Value="_serverPort" Min="1024" Max="65535" Style="width:100px;" />
     </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+        <label style="width:120px;">Logging Level:</label>
+        <RadzenDropDown TValue="ASCOM.Common.Interfaces.LogLevel"
+                        Data="@_logLevels"
+                        @bind-Value="_logLevel"
+                        Style="width:180px;" />
+    </div>
     <div>
         <RadzenButton Click="SaveSettings" Text="Save Settings" ButtonStyle="ButtonStyle.Primary" />
     </div>
@@ -111,10 +118,13 @@ else
 @code {
     private bool _discoveryRunning;
     private int _serverPort;
+    private ASCOM.Common.Interfaces.LogLevel _logLevel;
+    private readonly ASCOM.Common.Interfaces.LogLevel[] _logLevels = Enum.GetValues<ASCOM.Common.Interfaces.LogLevel>();
 
     protected override void OnInitialized()
     {
         _serverPort = settings.ServerPort;
+        _logLevel = settings.LogLevel;
         state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
         state.StateChanged += OnStateChanged;
         settings.ConfigurationChanged += OnStateChanged;
@@ -200,6 +210,8 @@ else
     {
         bool restartRequired = settings.ServerPort != _serverPort;
         settings.ServerPort = (ushort)_serverPort;
+        settings.LogLevel = _logLevel;
+        logger.SetMinimumLoggingLevel(_logLevel);
         settings.Save();
         if (restartRequired)
             state.DisplayRestartMessage = true;
