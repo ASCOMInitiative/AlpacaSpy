@@ -11,11 +11,7 @@ namespace AlpacaSpy
     /// logs the raw HTTP traffic, and forwards them to the actual device.
     /// Management API (/management/...) and Blazor routes pass through unmodified.
     /// </summary>
-    public class AlpacaProxyMiddleware(
-        RequestDelegate next,
-        IHttpClientFactory httpClientFactory,
-        State state,
-        AlpacaSpyLogger logger)
+    public class AlpacaProxyMiddleware(RequestDelegate next, IHttpClientFactory httpClientFactory, State state, AlpacaSpyLogger logger)
     {
         private static readonly Regex DeviceApiPattern =
             new(@"^/api/v1/([^/]+)/(\d+)/([^?]*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -24,16 +20,16 @@ namespace AlpacaSpy
         private static readonly Dictionary<string, AlpacaDeviceType> DeviceTypeMap =
             new(StringComparer.OrdinalIgnoreCase)
             {
-                ["camera"]              = AlpacaDeviceType.Camera,
-                ["covercalibrator"]     = AlpacaDeviceType.CoverCalibrator,
-                ["dome"]                = AlpacaDeviceType.Dome,
-                ["filterwheel"]         = AlpacaDeviceType.FilterWheel,
-                ["focuser"]             = AlpacaDeviceType.Focuser,
+                ["camera"] = AlpacaDeviceType.Camera,
+                ["covercalibrator"] = AlpacaDeviceType.CoverCalibrator,
+                ["dome"] = AlpacaDeviceType.Dome,
+                ["filterwheel"] = AlpacaDeviceType.FilterWheel,
+                ["focuser"] = AlpacaDeviceType.Focuser,
                 ["observingconditions"] = AlpacaDeviceType.ObservingConditions,
-                ["rotator"]             = AlpacaDeviceType.Rotator,
-                ["safetymonitor"]       = AlpacaDeviceType.SafetyMonitor,
-                ["switch"]              = AlpacaDeviceType.Switch,
-                ["telescope"]           = AlpacaDeviceType.Telescope,
+                ["rotator"] = AlpacaDeviceType.Rotator,
+                ["safetymonitor"] = AlpacaDeviceType.SafetyMonitor,
+                ["switch"] = AlpacaDeviceType.Switch,
+                ["telescope"] = AlpacaDeviceType.Telescope,
             };
 
         // Headers that must not be forwarded between hops
@@ -53,6 +49,7 @@ namespace AlpacaSpy
             var path = context.Request.Path.Value ?? string.Empty;
             var match = DeviceApiPattern.Match(path);
 
+            // Only process paths that match the Alpaca API protocol, other paths are passed to the rest of the pipeline for processing
             if (!match.Success)
             {
                 await next(context);
@@ -62,6 +59,7 @@ namespace AlpacaSpy
             string deviceTypeStr = match.Groups[1].Value;
             string method = match.Groups[3].Value;
 
+            // Check whether the given device type is valid
             if (!DeviceTypeMap.TryGetValue(deviceTypeStr, out var deviceType))
             {
                 // Unknown device type - let ASCOM.Alpaca.Razor return the error
@@ -69,16 +67,19 @@ namespace AlpacaSpy
                 return;
             }
 
+            // Check whether the device number matches one we are proxying
             if (!int.TryParse(match.Groups[2].Value, out int proxyDeviceNumber))
             {
                 await next(context);
                 return;
             }
 
-            var device = state.ConfiguredDevices.FirstOrDefault(d =>
+            // Get the specified device
+            ConfiguredDevice? device = state.ConfiguredDevices.FirstOrDefault(d =>
                 d.DeviceType == deviceType && d.ProxyDeviceNumber == proxyDeviceNumber);
 
-            if (device == null)
+            // Validate that we got a device i.e. that we are proxying the specified device
+            if (device == null) // We are not proxying this device so reject the request
             {
                 await ReturnAlpacaErrorAsync(context, 1024,
                     $"AlpacaSpy: no configured device for {deviceTypeStr}/{proxyDeviceNumber}");
@@ -88,18 +89,23 @@ namespace AlpacaSpy
             // Read and buffer the request body (needed for both logging and forwarding)
             byte[] requestBodyBytes = await ReadRequestBodyAsync(context);
 
-            // Log client → AlpacaSpy
+            // Log client request to AlpacaSpy
             LogClientRequest(context, device, requestBodyBytes, method);
 
             // Build the forwarding URL, translating the proxy device number to the real device number
-            string targetUrl =
-                $"http://{device.IpAddress}:{device.PortNumber}" +
-                $"/api/v1/{deviceTypeStr}/{device.RemoteDeviceNumber}/{method}" +
-                context.Request.QueryString.Value;
+            string targetUrl = $"http://{device.IpAddress}:{device.PortNumber}/api/v1/{deviceTypeStr}/{device.RemoteDeviceNumber}/{method}{context.Request.QueryString.Value}";
 
             var client = httpClientFactory.CreateClient("AlpacaProxy");
-            using var forwardRequest = BuildForwardRequest(context, targetUrl, requestBodyBytes);
+            using HttpRequestMessage forwardRequest = BuildForwardRequest(context, targetUrl, requestBodyBytes);
 
+            foreach (var header in forwardRequest.Headers)
+            {
+                logger.LogDebug("", $"Sending header {header.Key} = ");
+                foreach (var item in header.Value)
+                {
+                    logger.LogDebug("", $"Containing value  {item}");
+                }
+            }
             HttpResponseMessage responseMessage;
             byte[] responseBytes;
             try
@@ -134,6 +140,7 @@ namespace AlpacaSpy
                         context.Response.Headers[header.Key] = header.Value.ToArray();
                 }
 
+
                 await context.Response.Body.WriteAsync(responseBytes);
             }
         }
@@ -150,8 +157,7 @@ namespace AlpacaSpy
             return ms.ToArray();
         }
 
-        private static HttpRequestMessage BuildForwardRequest(
-            HttpContext context, string targetUrl, byte[] bodyBytes)
+        private static HttpRequestMessage BuildForwardRequest(HttpContext context, string targetUrl, byte[] bodyBytes)
         {
             var request = new HttpRequestMessage
             {
@@ -172,10 +178,6 @@ namespace AlpacaSpy
             if (bodyBytes.Length > 0)
             {
                 request.Content = new ByteArrayContent(bodyBytes);
-                if (!string.IsNullOrEmpty(context.Request.ContentType))
-                    request.Content.Headers.ContentType =
-                        System.Net.Http.Headers.MediaTypeHeaderValue.Parse(context.Request.ContentType);
-
                 foreach (var (key, values) in deferredContentHeaders)
                     request.Content.Headers.TryAddWithoutValidation(key, values);
             }
@@ -213,8 +215,7 @@ namespace AlpacaSpy
             WriteToLogs(device, sb.ToString().TrimEnd());
         }
 
-        private void LogDeviceResponse(
-            HttpResponseMessage response, byte[] responseBytes, ConfiguredDevice device)
+        private void LogDeviceResponse(HttpResponseMessage response, byte[] responseBytes, ConfiguredDevice device)
         {
             var sb = new StringBuilder();
             sb.AppendLine($"◄── {(int)response.StatusCode} {response.ReasonPhrase}  [{device.Name}]");
@@ -228,12 +229,34 @@ namespace AlpacaSpy
                     sb.AppendLine($"    {h.Key}: {string.Join(", ", h.Value)}");
             }
 
+            string? contentType = response.Content.Headers.ContentType?.ToString().ToLowerInvariant();
+
             if (device.LogDeviceJson && responseBytes.Length > 0)
             {
-                sb.AppendLine($"  DEVICE RESPONSE JSON: {Encoding.UTF8.GetString(responseBytes)}");
+                switch (contentType)
+                {
+                    case "application/json":
+                        {
+                            string text = Encoding.UTF8.GetString(responseBytes);
+                            sb.AppendLine($"  DEVICE RESPONSE JSON: {text[..Math.Min(150, text.Length)]}");
+                            break;
+                        }
+                    case "application/imagebytes":
+                        {
+                            string text = Encoding.ASCII.GetString(responseBytes);
+                            sb.AppendLine($"  DEVICE RESPONSE IMAGEBYTES: {text[..Math.Min(50, text.Length)]}");
+                            break;
+                        }
+                    default:
+                        {
+                            string text = Encoding.UTF8.GetString(responseBytes);
+                            sb.AppendLine($"  DEVICE RESPONSE: {text[..Math.Min(150, text.Length)]}");
+                            break;
+                        }
+                }
             }
 
-            if (device.LogJsonParameters && responseBytes.Length > 0)
+            if (device.LogJsonParameters && responseBytes.Length > 0 && contentType != "application/imagebytes")
             {
                 if (!device.LogDeviceJson && responseBytes.Length > 0)
                 {
@@ -248,6 +271,12 @@ namespace AlpacaSpy
                 catch (JsonException ex)
                 {
                     sb.AppendLine($"    Invalid JSON detected: {ex.Message}");
+                    sb.AppendLine($"      Response: {Encoding.UTF8.GetString(responseBytes)}");
+                }
+                catch (Exception ex)
+                {
+                    sb.AppendLine($"    Unable to parse device response: {Encoding.UTF8.GetString(responseBytes)}");
+                    sb.AppendLine($"      Exception: {ex.Message}");
                 }
             }
 
