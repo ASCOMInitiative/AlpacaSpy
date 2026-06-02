@@ -4,6 +4,7 @@
 @inject AlpacaSpyLogger logger
 @inject IJSRuntime JSRuntime
 @inject DialogService DialogService
+@using ASCOM.Alpaca.Discovery
 
 @implements IAsyncDisposable
 
@@ -220,7 +221,8 @@
         await InvokeAsync(StateHasChanged);
         try
         {
-            List<ASCOM.Alpaca.Discovery.AscomDevice> devices = await ASCOM.Alpaca.Discovery.AlpacaDiscovery.GetAscomDevicesAsync(null, 1, 100, 32227, settings.AlpacaDiscoveryDuration, false, true, false, ASCOM.Common.Alpaca.ServiceType.Http, logger, CancellationToken.None);
+            List<AscomDevice> devices = await AlpacaDiscovery.GetAscomDevicesAsync(null, 1, 100, 32227, settings.AlpacaDiscoveryDuration, false, true, false, ASCOM.Common.Alpaca.ServiceType.Http, logger, CancellationToken.None);
+            devices.RemoveAll(d => d.AscomDeviceName.StartsWith(Globals.APPLICATION_SHORT_NAME));
             lock (state.DiscoveredDevicesLock)
             {
                 state.DiscoveredDevices.Clear();
@@ -282,7 +284,7 @@
         settings.Save();
     }
 
-    private async Task AddDevice(ASCOM.Alpaca.Discovery.AscomDevice device)
+    private async Task AddDevice(AscomDevice device)
     {
         if (settings.ConfiguredDevices.Count >= Globals.MAX_CONFIGURED_DEVICES)
             return;
