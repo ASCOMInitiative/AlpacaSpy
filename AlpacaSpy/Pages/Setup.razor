@@ -125,6 +125,32 @@
                                         Name="@($"ljp_{device.UniqueId}")" />
                         <label>Log JSON parameters</label>
                     </div>
+                    <div style="margin-top:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                            <strong style="margin-right:auto;">Selective logging</strong>
+                            <RadzenButton Click="@(() => ClearAllSelected(device))"
+                                          Text="Clear All"
+                                          ButtonStyle="ButtonStyle.Primary"
+                                          Size="ButtonSize.Small" />
+                            <RadzenButton Click="@(() => SetAllSelected(device))"
+                                          Text="Set All"
+                                          ButtonStyle="ButtonStyle.Primary"
+                                          Size="ButtonSize.Small" />
+                        </div>
+
+                        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px;">
+                            @foreach (var member in SelectiveLoggingMetadata.GetMembers(device.DeviceType))
+                            {
+                                <div style="min-width:260px;display:flex;align-items:center;gap:8px;">
+                                    <RadzenCheckBox TValue="bool"
+                                                    Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
+                                                    ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
+                                                    Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
+                                    <label>@member.DisplayName</label>
+                                </div>
+                            }
+                        </div>
+                    </div>
                 </div>
             </RadzenTabsItem>
         }
@@ -199,6 +225,16 @@
         logger.LogMessage("Discovery", $"Cleared discovered Alpaca device(s).");
     }
 
+    private async Task ClearAllSelected(ConfiguredDevice device)
+    {
+        SelectiveLoggingMetadata.DisableAllMembers(device);
+    }
+
+    private async Task SetAllSelected(ConfiguredDevice device)
+    {
+        SelectiveLoggingMetadata.EnableAllMembers(device);
+    }
+
     private void AddDevice(ASCOM.Alpaca.Discovery.AscomDevice device)
     {
         if (settings.ConfiguredDevices.Count >= Globals.MAX_CONFIGURED_DEVICES)
@@ -221,7 +257,8 @@
             RemoteDeviceNumber = device.AlpacaDeviceNumber,
             DeviceType = deviceType,
             ProxyDeviceNumber = nextNumber,
-            UniqueId = Guid.NewGuid().ToString()
+            UniqueId = Guid.NewGuid().ToString(),
+            EnabledLogMembers = SelectiveLoggingMetadata.GetSelectionKeys(deviceType).ToList()
         };
 
         settings.ConfiguredDevices.Add(newDevice);
@@ -268,6 +305,12 @@
         if (restartRequired)
             state.DisplayRestartMessage = true;
         state.StatusText = $"Settings saved at {DateTime.Now:HH:mm:ss}.";
+    }
+
+    private void UpdateMemberLogging(ConfiguredDevice device, SelectiveLogMember member, bool enabled)
+    {
+        SelectiveLoggingMetadata.SetMemberEnabled(device, member, enabled);
+        settings.Save();
     }
 
     private async void OnStateChanged(object? sender, EventArgs e)

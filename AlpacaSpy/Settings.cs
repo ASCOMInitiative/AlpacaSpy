@@ -305,6 +305,9 @@ namespace AlpacaSpy
                 ServerPort = (ushort)Globals.DEFAULT_ALPACA_PORT;
             if (AlpacaDiscoveryDuration <= 0)
                 AlpacaDiscoveryDuration = Globals.ALPACA_DISCOVERY_DURATION_SECONDS;
+
+            foreach (ConfiguredDevice device in ConfiguredDevices)
+                SelectiveLoggingMetadata.NormalizeDeviceSelection(device);
         }
 
         protected virtual void Dispose(bool disposing)

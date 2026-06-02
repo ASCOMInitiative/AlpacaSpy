@@ -63,6 +63,9 @@ All ASCOM packages come from `https://nuget.cloudsmith.io/ascom/rc/v3/index.json
 
 AlpacaSpy runs on **32325** by default (Sentinel uses 32324). Port is configurable on the Settings page.
 
+## Implementation Rules
+- When defining variables, always use the correct variable type, do not use "var".
+
 ## Requirements
 
 See `docs/requirements.md` for full feature requirements.

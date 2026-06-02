@@ -90,8 +90,13 @@ namespace AlpacaSpy
             // Read and buffer the request body (needed for both logging and forwarding)
             byte[] requestBodyBytes = await ReadRequestBodyAsync(context);
 
+            SelectiveLogMemberType memberType = SelectiveLoggingMetadata.ResolveMemberType(deviceType, method, context.Request.Method);
+            var member = new SelectiveLogMember(method, memberType);
+            bool logThisCall = SelectiveLoggingMetadata.IsMemberEnabled(device, member);
+
             // Log client request to AlpacaSpy
-            LogClientRequest(context, device, requestBodyBytes, method);
+            if (logThisCall)
+                LogClientRequest(context, device, requestBodyBytes, method);
 
             // Build the forwarding URL, translating the proxy device number to the real device number
             string targetUrl = $"http://{device.IpAddress}:{device.PortNumber}/api/v1/{deviceTypeStr}/{device.RemoteDeviceNumber}/{method}{context.Request.QueryString.Value}";
@@ -100,16 +105,19 @@ namespace AlpacaSpy
             using HttpRequestMessage forwardRequest = BuildForwardRequest(context, targetUrl, requestBodyBytes);
 
             // List the headers we are sending
-            foreach (KeyValuePair<string, IEnumerable<string>> header in forwardRequest.Headers)
+            if (logThisCall)
             {
-                StringBuilder sb = new();
-                sb.Append($"Sending header {header.Key} =");
-
-                foreach (string item in header.Value)
+                foreach (KeyValuePair<string, IEnumerable<string>> header in forwardRequest.Headers)
                 {
-                    sb.Append($" {item},");
+                    StringBuilder sb = new();
+                    sb.Append($"Sending header {header.Key} =");
+
+                    foreach (string item in header.Value)
+                    {
+                        sb.Append($" {item},");
+                    }
+                    logger.LogDebug("Headers", sb.ToString());
                 }
-                logger.LogDebug("Headers", sb.ToString());
             }
 
             // Send the message to the device and wait for its response.
@@ -122,7 +130,8 @@ namespace AlpacaSpy
             }
             catch (Exception ex)
             {
-                logger.LogError("Proxy", $"Forward error → {device.Name} ({targetUrl}): {ex.Message}");
+                if (logThisCall)
+                    logger.LogError("Proxy", $"Forward error → {device.Name} ({targetUrl}): {ex.Message}");
                 await ReturnAlpacaErrorAsync(context, 1024, $"AlpacaSpy proxy error: {ex.Message}");
                 return;
             }
@@ -131,7 +140,8 @@ namespace AlpacaSpy
             using (responseMessage)
             {
                 // Log device's response
-                LogDeviceResponse(responseMessage, responseBytes, device);
+                if (logThisCall)
+                    LogDeviceResponse(responseMessage, responseBytes, device);
 
                 // Forward response to the original client
 
