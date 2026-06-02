@@ -438,6 +438,13 @@ namespace AlpacaSpy
         }
 
         private static IReadOnlyList<SelectiveLogMember> BuildMembers(params SelectiveLogMember[] deviceMembers)
-            => [.. CommonMembers, .. deviceMembers];
+        {
+            List<SelectiveLogMember> list = new List<SelectiveLogMember>();
+            list.AddRange(CommonMembers);
+            list.AddRange(deviceMembers);
+            list = list.OrderBy(member => member.DisplayName).ToList();
+
+            return list;
+        }
     }
 }
