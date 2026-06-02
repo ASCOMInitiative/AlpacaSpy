@@ -6,26 +6,29 @@
 @implements IAsyncDisposable
 
 <PageTitle>@Globals.APPLICATION_NAME - Setup</PageTitle>
-
 <h3>Device Discovery and Configuration</h3>
-
+@if (state.Connected)
+{
+    <div style="margin-top:20px;margin-bottom:20px;font-weight:bold;font-size:large; color:red;">Device state must be "Disconnected" in order to configure Proxy devices.</div>
+}
 <p>@state.StatusText</p>
 
 <div style="margin-bottom:16px;">
     <RadzenButton Click="RunDiscoveryAsync"
-                  Text="Discover Alpaca Devices"
+                  Text="Discover and select Alpaca devices"
                   ButtonStyle="ButtonStyle.Primary"
+                  Style="border-radius:20px; text-transform:none;"
                   Disabled="@(_discoveryRunning || state.Connected)" />
     @if (_discoveryRunning)
     {
-        <span style="margin-left:12px;">Discovering...</span>
+        <span style="margin-left:12px;">Searching for Alpaca devices...</span>
     }
 </div>
 
 @if (state.DiscoveredDevices.Any())
 {
     <h4>Discovered Devices</h4>
-    <RadzenDataGrid Data="@state.DiscoveredDevices" TItem="ASCOM.Alpaca.Discovery.AscomDevice" AllowPaging="false">
+    <RadzenDataGrid Data="@state.DiscoveredDevices" TItem="ASCOM.Alpaca.Discovery.AscomDevice" AllowPaging="false" AllowSorting="true">
         <Columns>
             <RadzenDataGridColumn TItem="ASCOM.Alpaca.Discovery.AscomDevice" Property="AscomDeviceName" Title="Name" Width="200px" />
             <RadzenDataGridColumn TItem="ASCOM.Alpaca.Discovery.AscomDevice" Property="AscomDeviceType" Title="Type" Width="120px" />
@@ -97,9 +100,9 @@ else
     <div style="display:flex;align-items:center;gap:8px;">
         <label style="width:120px;">Server Port:</label>
         <RadzenNumeric TValue="int"
-                       @bind-Value="_serverPort" 
-                       Min="1024" 
-                       Max="65535" 
+                       @bind-Value="_serverPort"
+                       Min="1024"
+                       Max="65535"
                        Change="@(() => SaveSettings())"
                        Style="width:100px;" />
     </div>
@@ -108,9 +111,8 @@ else
         <RadzenDropDown TValue="ASCOM.Common.Interfaces.LogLevel"
                         Data="@_logLevels"
                         @bind-Value="_logLevel"
-                        Style="width:180px;" 
-                        Change="@(() => SaveSettings())"
-                        />
+                        Style="width:180px;"
+                        Change="@(() => SaveSettings())" />
     </div>
 </div>
 
@@ -129,6 +131,7 @@ else
         state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
         state.StateChanged += OnStateChanged;
         settings.ConfigurationChanged += OnStateChanged;
+        state.StatusText = ""; // Clear status text on entry.
     }
 
     private async Task RunDiscoveryAsync()
@@ -195,16 +198,27 @@ else
     private void RemoveDevice(ConfiguredDevice device)
     {
         settings.ConfiguredDevices.Remove(device);
-        foreach (var type in Enum.GetValues<AlpacaDeviceType>())
+        // Renumber remaining devices of the same type to ensure contiguous numbering, starting at 0
+        foreach (AlpacaDeviceType type in Enum.GetValues<AlpacaDeviceType>())
         {
-            int idx = 0;
-            foreach (var configured in settings.ConfiguredDevices.Where(d => d.DeviceType == type))
-                configured.ProxyDeviceNumber = idx++;
+            int idx = -1;
+            foreach (ConfiguredDevice configuredDevice in settings.ConfiguredDevices.Where(d => d.DeviceType == type))
+            {
+                // Increment the index to the next value. Since it is initialised to -1, the first device of each type will be set to 0
+                idx++;
+                // Check whether the device's proxy number matches the expected value. If not, update it and mark that a restart is required to apply the change
+                if (configuredDevice.ProxyDeviceNumber != idx)
+                {
+                    configuredDevice.ProxyDeviceNumber = idx;
+                    state.DisplayRestartMessage = true;
+                }
+            }
         }
+        // Update the state and save settings
         state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
         settings.Save();
-        state.DisplayRestartMessage = true;
-        state.StatusText = $"Removed {device.Name}. Restart required for changes to take effect.";
+
+        state.StatusText = $"Removed {device.Name}.";
     }
 
     private void SaveSettings()

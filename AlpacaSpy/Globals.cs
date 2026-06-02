@@ -19,8 +19,8 @@ namespace AlpacaSpy
         internal const int RESTART_DELAY = 1;
         internal const int DISCONNECTED_CIRCUIT_RETENTION_PERIOD = 180;
         internal const int LOG_REFRESH_INTERVAL = 250;
-        internal const int MAX_CONFIGURED_DEVICES = 10;
-        internal const double ALPACA_DISCOVERY_DURATION_SECONDS = 2.0;
+        internal const int MAX_CONFIGURED_DEVICES = 20;
+        internal const double ALPACA_DISCOVERY_DURATION_SECONDS = 1.0;
 
         internal static readonly Lock writeLogLock = new();
         internal static readonly SemaphoreSlim ConnectSemaphore = new(1, 1);
