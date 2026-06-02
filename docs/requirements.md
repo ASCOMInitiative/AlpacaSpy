@@ -82,3 +82,10 @@ Each of the above five categories must be **individually configurable on/off per
 
 - A **Connect / Disconnect button** on the Index page connects to or disconnects from all configured devices.
 - A **Settings option** (`AutoConnect`) causes AlpacaSpy to automatically connect to configured devices on startup (triggered via `applicationLifetime.ApplicationStarted`, same as Sentinel).
+
+## Selective Logging Feature
+- The settings page must allow users to enable or disable logging of each member of the selected device's ASCOM device interface 
+(e.g., for a telescope: `RightAscension`, `Declination`, `SlewToCoordinates()`, etc.). This should be implemented as a list of checkboxes generated dynamically 
+based on the device's supported interface members, allowing granular control over what is logged for each device.
+- The logging configuration for each device must be persisted in the settings JSON file and applied in real time without requiring a restart.
+- Update the alpacaproxymiddleware.cs class to check the logging configuration before logging each API call, ensuring that only enabled members are logged for each device.
