@@ -19,10 +19,25 @@
                   ButtonStyle="ButtonStyle.Primary"
                   Style="border-radius:20px; text-transform:none;"
                   Disabled="@(_discoveryRunning || state.Connected)" />
+
     @if (_discoveryRunning)
     {
         <span style="margin-left:12px;">Searching for Alpaca devices...</span>
     }
+
+    <div style="margin-left:auto;display:flex;gap:8px;justify-content:flex-end;">
+        <RadzenButton Click="ClearDiscoveredDevicesAsync"
+                      Text="Clear discovered devices"
+                      ButtonStyle="ButtonStyle.Warning"
+                      Style="border-radius:20px; text-transform:none;"
+                      Disabled="@(_discoveryRunning || state.Connected)" />
+
+        <RadzenButton Click="ClearConfiguredDevicesAsync"
+                      Text="Clear configured devices"
+                      ButtonStyle="ButtonStyle.Danger"
+                      Style="border-radius:20px; text-transform:none;"
+                      Disabled="@(_discoveryRunning || state.Connected)" />
+    </div>
 </div>
 
 @if (state.DiscoveredDevices.Any())
@@ -47,74 +62,74 @@
     </RadzenDataGrid>
 }
 
-<h4 style="margin-top:24px;">Configured Proxy Devices (@settings.ConfiguredDevices.Count / @Globals.MAX_CONFIGURED_DEVICES)</h4>
-@if (!settings.ConfiguredDevices.Any())
-{
-    <p style="color:gray;">No devices configured. Discover and add devices above.</p>
-}
-else
-{
-    @foreach (var device in settings.ConfiguredDevices)
-    {
-        <div style="border:1px solid #ccc;padding:12px;margin-bottom:8px;border-radius:4px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <strong>@device.Name (@device.DeviceType)</strong>
-                <RadzenButton Click="@(() => RemoveDevice(device))"
-                              Text="Remove"
-                              ButtonStyle="ButtonStyle.Danger"
-                              Size="ButtonSize.Small"
-                              Disabled="@state.Connected" />
-            </div>
-            <div style="color:gray;font-size:small;">@device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber → Proxy device @device.ProxyDeviceNumber</div>
-            <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                <RadzenCheckBox Value="device.LogClientHeaders"
-                                ValueChanged="@((bool v) => { device.LogClientHeaders = v; settings.Save(); })"
-                                Name="@($"lch_{device.UniqueId}")" />
-                <label>Log client headers</label>
-                <RadzenCheckBox Value="device.LogClientParams"
-                                ValueChanged="@((bool v) => { device.LogClientParams = v; settings.Save(); })"
-                                Name="@($"lcq_{device.UniqueId}")" />
-                <label>Log client parameters</label>
-                <RadzenCheckBox Value="device.LogDeviceHeaders"
-                                ValueChanged="@((bool v) => { device.LogDeviceHeaders = v; settings.Save(); })"
-                                Name="@($"ldh_{device.UniqueId}")" />
-                <label>Log device headers</label>
-                <RadzenCheckBox Value="device.LogJsonParameters"
-                                ValueChanged="@((bool v) => { device.LogJsonParameters = v; settings.Save(); })"
-                                Name="@($"ljp_{device.UniqueId}")" />
-                <label>Log JSON parameters</label>
-            </div>
-        </div>
-    }
-}
-
 <h4 style="margin-top:24px;">Settings</h4>
-<div style="display:flex;flex-direction:column;gap:8px;max-width:400px;">
-    <div style="display:flex;align-items:center;gap:8px;">
-        <RadzenCheckBox TValue="bool"
-                        Value="_autoConnect"
-                        ValueChanged="@((bool v) => { _autoConnect = v; SaveSettings(); })"
-                        Name="autoConnect" />
-        <label>Auto-connect on startup</label>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-        <label style="width:120px;">Server Port:</label>
-        <RadzenNumeric TValue="int"
-                       @bind-Value="_serverPort"
-                       Min="1024"
-                       Max="65535"
-                       Change="@(() => SaveSettings())"
-                       Style="width:100px;" />
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-        <label style="width:120px;">Logging Level:</label>
-        <RadzenDropDown TValue="ASCOM.Common.Interfaces.LogLevel"
-                        Data="@_logLevels"
-                        @bind-Value="_logLevel"
-                        Style="width:180px;"
-                        Change="@(() => SaveSettings())" />
-    </div>
-</div>
+<RadzenTabs>
+    <Tabs>
+        <RadzenTabsItem Text="Settings">
+            <div style="display:flex;flex-direction:column;gap:8px;max-width:400px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="_autoConnect"
+                                    ValueChanged="@((bool v) => { _autoConnect = v; SaveSettings(); })"
+                                    Name="autoConnect" />
+                    <label>Auto-connect on startup</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:120px;">Server Port:</label>
+                    <RadzenNumeric TValue="int"
+                                   @bind-Value="_serverPort"
+                                   Min="1024"
+                                   Max="65535"
+                                   Change="@(() => SaveSettings())"
+                                   Style="width:100px;" />
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:120px;">Logging Level:</label>
+                    <RadzenDropDown TValue="ASCOM.Common.Interfaces.LogLevel"
+                                    Data="@_logLevels"
+                                    @bind-Value="_logLevel"
+                                    Style="width:180px;"
+                                    Change="@(() => SaveSettings())" />
+                </div>
+            </div>
+        </RadzenTabsItem>
+
+        @foreach (var device in settings.ConfiguredDevices)
+        {
+            <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId">
+                <div style="border:1px solid #ccc;padding:12px;border-radius:4px;max-width:800px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                        <strong>@device.Name (@device.DeviceType)</strong>
+                        <RadzenButton Click="@(() => RemoveDevice(device))"
+                                      Text="Remove"
+                                      ButtonStyle="ButtonStyle.Danger"
+                                      Size="ButtonSize.Small"
+                                      Disabled="@state.Connected" />
+                    </div>
+                    <div style="color:gray;font-size:small;">@device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber → Proxy device @device.ProxyDeviceNumber</div>
+                    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                        <RadzenCheckBox Value="device.LogClientHeaders"
+                                        ValueChanged="@((bool v) => { device.LogClientHeaders = v; settings.Save(); })"
+                                        Name="@($"lch_{device.UniqueId}")" />
+                        <label>Log client headers</label>
+                        <RadzenCheckBox Value="device.LogClientParams"
+                                        ValueChanged="@((bool v) => { device.LogClientParams = v; settings.Save(); })"
+                                        Name="@($"lcq_{device.UniqueId}")" />
+                        <label>Log client parameters</label>
+                        <RadzenCheckBox Value="device.LogDeviceHeaders"
+                                        ValueChanged="@((bool v) => { device.LogDeviceHeaders = v; settings.Save(); })"
+                                        Name="@($"ldh_{device.UniqueId}")" />
+                        <label>Log device headers</label>
+                        <RadzenCheckBox Value="device.LogJsonParameters"
+                                        ValueChanged="@((bool v) => { device.LogJsonParameters = v; settings.Save(); })"
+                                        Name="@($"ljp_{device.UniqueId}")" />
+                        <label>Log JSON parameters</label>
+                    </div>
+                </div>
+            </RadzenTabsItem>
+        }
+    </Tabs>
+</RadzenTabs>
 
 @code {
     private bool _discoveryRunning;
@@ -161,6 +176,27 @@ else
             _discoveryRunning = false;
             await InvokeAsync(StateHasChanged);
         }
+    }
+
+    private async Task ClearConfiguredDevicesAsync()
+    {
+        if (state.Connected)
+            return;
+        bool confirm = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to clear all configured devices? This action cannot be undone.");
+        if (!confirm)
+            return;
+        settings.ConfiguredDevices.Clear();
+        state.ConfiguredDevices.Clear();
+        settings.Save();
+        state.StatusText = "All configured devices have been cleared.";
+    }
+
+    private async Task ClearDiscoveredDevicesAsync()
+    {
+        state.DiscoveredDevices.Clear();
+        state.DiscoveryHasRun = true;
+        state.StatusText = $"Cleared discovered devices at {DateTime.Now:HH:mm:ss}.";
+        logger.LogMessage("Discovery", $"Cleared discovered Alpaca device(s).");
     }
 
     private void AddDevice(ASCOM.Alpaca.Discovery.AscomDevice device)
