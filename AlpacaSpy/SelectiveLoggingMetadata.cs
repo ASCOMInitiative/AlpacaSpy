@@ -322,7 +322,12 @@ namespace AlpacaSpy
             };
 
         public static IReadOnlyList<SelectiveLogMember> GetMembers(AlpacaDeviceType deviceType)
-            => MembersByDevice.TryGetValue(deviceType, out var members) ? members : CommonMembers;
+        {
+            if (MembersByDevice.TryGetValue(deviceType, out IReadOnlyList<SelectiveLogMember>? members) && members is not null)
+                return members;
+
+            return CommonMembers;
+        }
 
         public static IReadOnlyList<string> GetSelectionKeys(AlpacaDeviceType deviceType)
             => GetMembers(deviceType).Select(member => member.SelectionKey).ToArray();
@@ -361,7 +366,7 @@ namespace AlpacaSpy
             if (device.EnabledLogMembers is null)
                 return false;
 
-            var normalized = new List<string>();
+            List<string> normalized = [];
             foreach (string entry in device.EnabledLogMembers)
             {
                 if (TryParseSelectionKey(entry, out SelectiveLogMemberType memberType, out string memberName))
@@ -399,7 +404,9 @@ namespace AlpacaSpy
 
         public static SelectiveLogMemberType ResolveMemberType(AlpacaDeviceType deviceType, string memberName, string httpMethod)
         {
-            var members = GetMembers(deviceType).Where(member => string.Equals(member.MemberName, memberName, StringComparison.OrdinalIgnoreCase)).ToList();
+            List<SelectiveLogMember> members = GetMembers(deviceType)
+                .Where(member => string.Equals(member.MemberName, memberName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
             if (members.Any(member => member.MemberType == SelectiveLogMemberType.Method))
                 return SelectiveLogMemberType.Method;

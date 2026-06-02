@@ -70,7 +70,7 @@ namespace AlpacaSpy
                 .Append($"{Globals.WELCOME_MESSAGE}\r\n");
             ConfiguredDevices = new List<ConfiguredDevice>();
             ProxyDevices = new List<object>();
-            foreach (var tl in DeviceLoggers.Values) try { tl.Dispose(); } catch { }
+            foreach (TraceLogger tl in DeviceLoggers.Values) try { tl.Dispose(); } catch { }
             DeviceLoggers = new Dictionary<string, TraceLogger>();
             lock (DiscoveredDevicesLock)
             {

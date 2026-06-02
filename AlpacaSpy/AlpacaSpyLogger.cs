@@ -47,7 +47,7 @@ namespace AlpacaSpy
                     {
                         string formattedMessage = $"{DateTime.Now:HH:mm:ss.fff} {logLevel,-13} {message}";
                         Console.Write($"{DateTime.Now:HH:mm:ss.fff} ");
-                        var originalColour = Console.ForegroundColor;
+                        ConsoleColor originalColour = Console.ForegroundColor;
 
                         switch (logLevel)
                         {

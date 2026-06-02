@@ -48,8 +48,8 @@ namespace AlpacaSpy
 
         public async Task InvokeAsync(HttpContext context)
         {
-            var path = context.Request.Path.Value ?? string.Empty;
-            var match = DeviceApiPattern.Match(path);
+            string path = context.Request.Path.Value ?? string.Empty;
+            Match match = DeviceApiPattern.Match(path);
 
             // Only process paths that match the Alpaca API protocol, other paths are passed to the rest of the pipeline for processing
             if (!match.Success)
@@ -62,7 +62,7 @@ namespace AlpacaSpy
             string method = match.Groups[3].Value;
 
             // Check whether the given device type is valid
-            if (!DeviceTypeMap.TryGetValue(deviceTypeStr, out var deviceType))
+            if (!DeviceTypeMap.TryGetValue(deviceTypeStr, out AlpacaDeviceType deviceType))
             {
                 // Unknown device type - let ASCOM.Alpaca.Razor return the error
                 await next(context);
@@ -91,7 +91,7 @@ namespace AlpacaSpy
             byte[] requestBodyBytes = await ReadRequestBodyAsync(context);
 
             SelectiveLogMemberType memberType = SelectiveLoggingMetadata.ResolveMemberType(deviceType, method, context.Request.Method);
-            var member = new SelectiveLogMember(method, memberType);
+            SelectiveLogMember member = new(method, memberType);
             bool logThisCall = SelectiveLoggingMetadata.IsMemberEnabled(device, member);
 
             // Log client request to AlpacaSpy
@@ -101,7 +101,7 @@ namespace AlpacaSpy
             // Build the forwarding URL, translating the proxy device number to the real device number
             string targetUrl = $"http://{device.IpAddress}:{device.PortNumber}/api/v1/{deviceTypeStr}/{device.RemoteDeviceNumber}/{method}{context.Request.QueryString.Value}";
 
-            var client = httpClientFactory.CreateClient("AlpacaProxy");
+            HttpClient client = httpClientFactory.CreateClient("AlpacaProxy");
             using HttpRequestMessage forwardRequest = BuildForwardRequest(context, targetUrl, requestBodyBytes);
 
             // List the headers we are sending
@@ -149,14 +149,14 @@ namespace AlpacaSpy
                 context.Response.StatusCode = (int)responseMessage.StatusCode;
 
                 // Add the response headers
-                foreach (var header in responseMessage.Headers)
+                foreach (KeyValuePair<string, IEnumerable<string>> header in responseMessage.Headers)
                 {
                     if (!HopByHopHeaders.Contains(header.Key))
                         context.Response.Headers[header.Key] = header.Value.ToArray();
                 }
 
                 // Add response content headers
-                foreach (var header in responseMessage.Content.Headers)
+                foreach (KeyValuePair<string, IEnumerable<string>> header in responseMessage.Content.Headers)
                 {
                     if (!HopByHopHeaders.Contains(header.Key))
                         context.Response.Headers[header.Key] = header.Value.ToArray();
@@ -173,7 +173,7 @@ namespace AlpacaSpy
                 return [];
 
             context.Request.EnableBuffering();
-            using var ms = new MemoryStream();
+            using MemoryStream ms = new();
             await context.Request.Body.CopyToAsync(ms);
             context.Request.Body.Position = 0;
             return ms.ToArray();
@@ -181,7 +181,7 @@ namespace AlpacaSpy
 
         private static HttpRequestMessage BuildForwardRequest(HttpContext context, string targetUrl, byte[] bodyBytes)
         {
-            var request = new HttpRequestMessage
+            HttpRequestMessage request = new()
             {
                 Method = new HttpMethod(context.Request.Method),
                 RequestUri = new Uri(targetUrl)
@@ -189,8 +189,8 @@ namespace AlpacaSpy
 
             // Collect headers rejected by HttpRequestMessage.Headers (i.e. content headers) so they
             // can be applied to request.Content after the body is assigned — not before (fix: was null).
-            var deferredContentHeaders = new List<(string Key, string?[] Values)>();
-            foreach (var header in context.Request.Headers)
+            List<(string Key, string?[] Values)> deferredContentHeaders = [];
+            foreach (KeyValuePair<string, Microsoft.Extensions.Primitives.StringValues> header in context.Request.Headers)
             {
                 if (HopByHopHeaders.Contains(header.Key)) continue;
                 if (!request.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
@@ -203,8 +203,12 @@ namespace AlpacaSpy
             if (bodyBytes.Length > 0)
             {
                 request.Content = new ByteArrayContent(bodyBytes);
-                foreach (var (key, values) in deferredContentHeaders)
+                foreach ((string Key, string?[] Values) deferredHeader in deferredContentHeaders)
+                {
+                    string key = deferredHeader.Key;
+                    string?[] values = deferredHeader.Values;
                     request.Content.Headers.TryAddWithoutValidation(key, values);
+                }
             }
 
             return request;
@@ -213,13 +217,13 @@ namespace AlpacaSpy
         private void LogClientRequest(
             HttpContext context, ConfiguredDevice device, byte[] bodyBytes, string method)
         {
-            var sb = new StringBuilder();
+            StringBuilder sb = new();
             sb.Append($"──► {context.Request.Method} /api/v1/{device.DeviceType.ToString().ToLower()}/{device.ProxyDeviceNumber}/{method}{context.Request.QueryString}  [{device.Name}]");
 
             if (bodyBytes.Length > 0)
             {
                 sb.Append("  BODY PARAMETERS:");
-                foreach (var part in Encoding.UTF8.GetString(bodyBytes).Split('&'))
+                foreach (string part in Encoding.UTF8.GetString(bodyBytes).Split('&'))
                     sb.Append($" {part},");
             }
             sb.AppendLine();
@@ -227,20 +231,20 @@ namespace AlpacaSpy
             if (device.LogClientHeaders)
             {
                 sb.AppendLine("  CLIENT HEADERS:");
-                foreach (var h in context.Request.Headers)
+                foreach (KeyValuePair<string, Microsoft.Extensions.Primitives.StringValues> h in context.Request.Headers)
                     sb.AppendLine($"    {h.Key}: {h.Value}");
             }
 
             if (device.LogClientParams && context.Request.QueryString.HasValue)
             {
                 sb.AppendLine("  QUERY PARAMETERS:");
-                foreach (var q in context.Request.Query)
+                foreach (KeyValuePair<string, Microsoft.Extensions.Primitives.StringValues> q in context.Request.Query)
                     sb.AppendLine($"    {q.Key} = {q.Value}");
             }
             if (device.LogClientParams && bodyBytes.Length > 0)
             {
                 sb.AppendLine("  BODY PARAMETERS:");
-                foreach (var part in Encoding.UTF8.GetString(bodyBytes).Split('&'))
+                foreach (string part in Encoding.UTF8.GetString(bodyBytes).Split('&'))
                     sb.AppendLine($"    {part},");
             }
 
@@ -252,7 +256,7 @@ namespace AlpacaSpy
             string? contentType = response.Content.Headers.ContentType?.ToString().ToLowerInvariant().Split(";").First().Trim();
             logger.LogDebug("ContentType", $"Content type is null: {contentType is null} - {(contentType is null ? "NULL" : contentType)}");
             string text;
-            var sb = new StringBuilder();
+            StringBuilder sb = new();
             sb.Append($"◄── {(int)response.StatusCode} {response.ReasonPhrase} - ");
 
             if (responseBytes.Length > 0)
@@ -278,9 +282,9 @@ namespace AlpacaSpy
             if (device.LogDeviceHeaders)
             {
                 sb.AppendLine("  DEVICE RESPONSE HEADERS:");
-                foreach (var h in response.Headers)
+                foreach (KeyValuePair<string, IEnumerable<string>> h in response.Headers)
                     sb.AppendLine($"    {h.Key}: {string.Join(", ", h.Value)}");
-                foreach (var h in response.Content.Headers)
+                foreach (KeyValuePair<string, IEnumerable<string>> h in response.Content.Headers)
                     sb.AppendLine($"    {h.Key}: {string.Join(", ", h.Value)}");
             }
             if (device.LogJsonParameters && responseBytes.Length > 0 && contentType != "application/imagebytes")
@@ -288,8 +292,8 @@ namespace AlpacaSpy
                 sb.AppendLine($"  JSON NAME-VALUE PAIRS:");
                 try
                 {
-                    using var doc = JsonDocument.Parse(responseBytes);
-                    foreach (var prop in doc.RootElement.EnumerateObject())
+                    using JsonDocument doc = JsonDocument.Parse(responseBytes);
+                    foreach (JsonProperty prop in doc.RootElement.EnumerateObject())
                         sb.AppendLine($"    {prop.Name}: {prop.Value}");
                 }
                 catch (JsonException ex)
@@ -311,7 +315,7 @@ namespace AlpacaSpy
         {
             logger.LogMessage(device.Name, message);
 
-            if (state.DeviceLoggers.TryGetValue(device.UniqueId, out var traceLogger))
+            if (state.DeviceLoggers.TryGetValue(device.UniqueId, out TraceLogger? traceLogger) && traceLogger is not null)
                 traceLogger.LogMessage("Proxy", message);
         }
 
@@ -320,10 +324,10 @@ namespace AlpacaSpy
         {
             // Parse ClientTransactionID from query string so the client can correlate errors
             int clientTxId = 0;
-            if (context.Request.Query.TryGetValue("ClientTransactionID", out var ctStr))
+            if (context.Request.Query.TryGetValue("ClientTransactionID", out Microsoft.Extensions.Primitives.StringValues ctStr))
                 int.TryParse(ctStr, out clientTxId);
 
-            var error = new
+            object error = new
             {
                 ClientTransactionID = clientTxId,
                 ServerTransactionID = (int)state.GetServerTransactionId(),

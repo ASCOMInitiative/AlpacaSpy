@@ -19,7 +19,7 @@
 <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
 
 <script>
-    var dotNetHelperIndexPage;
+    let dotNetHelperIndexPage;
 
     function onResizeIndex() {
         if (dotNetHelperIndexPage) {
@@ -39,7 +39,7 @@
         window.dotNetHelperIndexPage = null;
     }
 
-    var dotNetHelperSetupPage;
+    let dotNetHelperSetupPage;
 
     function onResizeSetup() {
         if (dotNetHelperSetupPage) {

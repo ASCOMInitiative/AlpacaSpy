@@ -96,7 +96,7 @@
             </div>
         </RadzenTabsItem>
 
-        @foreach (var device in settings.ConfiguredDevices)
+        @foreach (ConfiguredDevice device in settings.ConfiguredDevices)
         {
             <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId">
                 <div style="border:1px solid #ccc;padding:12px;border-radius:4px;max-width:900px;">
@@ -144,15 +144,15 @@
                         </div>
 
                         @{
-                            var members = SelectiveLoggingMetadata.GetMembers(device.DeviceType).ToList();
-                            var splitIndex = (members.Count + 2) / 3;
-                            var leftMembers = members.Take(splitIndex).ToList();
-                            var middleMembers = members.Skip(splitIndex).Take(splitIndex);
-                            var rightMembers = members.Skip(splitIndex * 2).ToList();
+                            List<SelectiveLogMember> members = SelectiveLoggingMetadata.GetMembers(device.DeviceType).ToList();
+                            int splitIndex = (members.Count + 2) / 3;
+                            List<SelectiveLogMember> leftMembers = members.Take(splitIndex).ToList();
+                            IEnumerable<SelectiveLogMember> middleMembers = members.Skip(splitIndex).Take(splitIndex);
+                            List<SelectiveLogMember> rightMembers = members.Skip(splitIndex * 2).ToList();
                         }
                         <div style="margin-top:8px;display:flex;gap:24px;align-items:flex-start;">
                             <div style="flex:1;min-width:300px;">
-                                @foreach (var member in leftMembers)
+                                @foreach (SelectiveLogMember member in leftMembers)
                                 {
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                                         <RadzenCheckBox TValue="bool"
@@ -164,7 +164,7 @@
                                 }
                             </div>
                             <div style="flex:1;min-width:300px;">
-                                @foreach (var member in middleMembers)
+                                @foreach (SelectiveLogMember member in middleMembers)
                                 {
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                                         <RadzenCheckBox TValue="bool"
@@ -176,7 +176,7 @@
                                 }
                             </div>
                             <div style="flex:1;min-width:300px;">
-                                @foreach (var member in rightMembers)
+                                @foreach (SelectiveLogMember member in rightMembers)
                                 {
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                                         <RadzenCheckBox TValue="bool"
@@ -220,7 +220,7 @@
         await InvokeAsync(StateHasChanged);
         try
         {
-            var devices = await ASCOM.Alpaca.Discovery.AlpacaDiscovery.GetAscomDevicesAsync(null, 1, 100, 32227, settings.AlpacaDiscoveryDuration, false, true, false, ASCOM.Common.Alpaca.ServiceType.Http, logger, CancellationToken.None);
+            List<ASCOM.Alpaca.Discovery.AscomDevice> devices = await ASCOM.Alpaca.Discovery.AlpacaDiscovery.GetAscomDevicesAsync(null, 1, 100, 32227, settings.AlpacaDiscoveryDuration, false, true, false, ASCOM.Common.Alpaca.ServiceType.Http, logger, CancellationToken.None);
             lock (state.DiscoveredDevicesLock)
             {
                 state.DiscoveredDevices.Clear();
@@ -287,7 +287,7 @@
         if (settings.ConfiguredDevices.Count >= Globals.MAX_CONFIGURED_DEVICES)
             return;
 
-        if (device.AscomDeviceType is null || !Enum.TryParse<AlpacaDeviceType>(device.AscomDeviceType.Value.ToString(), true, out var deviceType))
+        if (device.AscomDeviceType is null || !Enum.TryParse<AlpacaDeviceType>(device.AscomDeviceType.Value.ToString(), true, out AlpacaDeviceType deviceType))
             return;
 
         int nextNumber = settings.ConfiguredDevices
@@ -296,7 +296,7 @@
             .DefaultIfEmpty(-1)
             .Max() + 1;
 
-        var newDevice = new ConfiguredDevice
+        ConfiguredDevice newDevice = new()
         {
             Name = device.AscomDeviceName,
             IpAddress = device.IpAddress.ToString(),

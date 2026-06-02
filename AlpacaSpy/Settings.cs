@@ -228,7 +228,7 @@ namespace AlpacaSpy
                     lock (Globals.writeLogLock)
                     {
                         Console.Write($"{DateTime.Now:HH:mm:ss.fff} ");
-                        var originalColour = Console.ForegroundColor;
+                        ConsoleColor originalColour = Console.ForegroundColor;
                         switch (logLevel)
                         {
                             case LogLevel.Debug:

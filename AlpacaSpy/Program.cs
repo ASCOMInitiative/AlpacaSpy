@@ -63,7 +63,7 @@ namespace AlpacaSpy
 
             logger.LogBlankLine();
 
-            var builder = WebApplication.CreateBuilder(args ?? []);
+            WebApplicationBuilder builder = WebApplication.CreateBuilder(args ?? []);
 
             if (!(args?.Any(str => str.Contains("--urls")) ?? false))
             {
@@ -102,7 +102,7 @@ namespace AlpacaSpy
             builder.Services.AddSingleton<Settings>(_ => settings);
             builder.Services.AddSingleton<CircuitHandler, CircuitHandlerService>();
 
-            var app = builder.Build();
+            WebApplication app = builder.Build();
 
             if (!app.Environment.IsDevelopment())
                 app.UseExceptionHandler("/Error");
@@ -195,7 +195,7 @@ namespace AlpacaSpy
             state.ConfiguredDevices = settings.ConfiguredDevices?.ToList() ?? new List<Models.ConfiguredDevice>();
             settings.ConfiguredDevices ??= new List<Models.ConfiguredDevice>();
 
-            foreach (var config in settings.ConfiguredDevices)
+            foreach (Models.ConfiguredDevice config in settings.ConfiguredDevices)
             {
                 string proxyName = $"AlpacaSpy - {config.Name}";
                 try
@@ -256,7 +256,7 @@ namespace AlpacaSpy
 
                     // Create a per-device TraceLogger for file-based traffic logging
                     string safeName = Regex.Replace(config.Name, @"[^\w]", "_");
-                    var deviceLogger = new TraceLogger($"AlpacaSpy.{safeName}", true);
+                    TraceLogger deviceLogger = new($"AlpacaSpy.{safeName}", true);
                     state.DeviceLoggers[config.UniqueId] = deviceLogger;
                 }
                 catch (Exception ex)

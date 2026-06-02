@@ -1,3 +1,4 @@
+using AlpacaSpy.Models;
 using System.Text.RegularExpressions;
 
 namespace AlpacaSpy
@@ -48,7 +49,7 @@ namespace AlpacaSpy
             await Globals.ConnectSemaphore.WaitAsync();
             try
             {
-                var devices = state.ConfiguredDevices;
+                List<ConfiguredDevice> devices = state.ConfiguredDevices;
                 if (devices.Count == 0)
                 {
                     logger.LogMessage("Connect", "No devices configured. Add devices in Setup and restart.");
@@ -58,15 +59,15 @@ namespace AlpacaSpy
                 logger.LogMessage("Connect", $"Checking connectivity to {devices.Count} configured device(s)...");
                 int successCount = 0;
 
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                foreach (var device in devices)
+                using HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
+                foreach (ConfiguredDevice device in devices)
                 {
                     try
                     {
                         logger.LogMessage("Connect", $"  Checking {device.Name} at {device.IpAddress}:{device.PortNumber}...");
                         string deviceTypePath = DeviceTypePath(device.DeviceType);
                         string url = $"http://{device.IpAddress}:{device.PortNumber}/api/v1/{deviceTypePath}/{device.RemoteDeviceNumber}/connected";
-                        var response = await httpClient.GetAsync(url);
+                        HttpResponseMessage response = await httpClient.GetAsync(url);
                         if (response.IsSuccessStatusCode)
                         {
                             successCount++;
