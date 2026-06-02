@@ -1,3 +1,6 @@
+using AlpacaSpy.Models;
+using ASCOM.Common;
+
 namespace AlpacaSpy
 {
     internal static class Globals
@@ -21,6 +24,21 @@ namespace AlpacaSpy
         internal const int LOG_REFRESH_INTERVAL = 250;
         internal const int MAX_CONFIGURED_DEVICES = 10;
         internal const double ALPACA_DISCOVERY_DURATION_SECONDS = 1.0;
+
+        // The number of columns to display for each device type in the setup window's property list.
+        internal static readonly Dictionary<AlpacaDeviceType, int> DevicetypeDisplayColumns = new()
+        {
+            { AlpacaDeviceType.Camera, 5 },
+            { AlpacaDeviceType.CoverCalibrator, 2 },
+            { AlpacaDeviceType.Dome, 3 },
+            { AlpacaDeviceType.FilterWheel, 2 },
+            { AlpacaDeviceType.Focuser, 2 },
+            { AlpacaDeviceType.ObservingConditions, 2 },
+            { AlpacaDeviceType.Rotator, 2 },
+            { AlpacaDeviceType.SafetyMonitor, 2 },
+            { AlpacaDeviceType.Switch, 3 },
+            { AlpacaDeviceType.Telescope, 5 }
+        };
 
         internal static readonly Lock writeLogLock = new();
         internal static readonly SemaphoreSlim ConnectSemaphore = new(1, 1);

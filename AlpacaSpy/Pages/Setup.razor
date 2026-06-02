@@ -99,11 +99,29 @@
 
         @foreach (ConfiguredDevice device in settings.ConfiguredDevices)
         {
+            // Get a list of all members
+            List<SelectiveLogMember> members = SelectiveLoggingMetadata.GetMembers(device.DeviceType).ToList();
+
+            // Get the number of columns required for this device type,
+            int numberOfColumns = Globals.DevicetypeDisplayColumns.TryGetValue(device.DeviceType, out int cols) ? cols : 1;
+
+            // Calculate the number of items per column, rounding up to ensure all items are included
+            int splitIndex = (members.Count + numberOfColumns - 1) / numberOfColumns;
+
+            // Create a dictionary to hold the members for each column
+            Dictionary<int, List<SelectiveLogMember>> columns = new();
+            for (int i = 0; i < numberOfColumns; i++)
+            {
+                columns[i] = members.Skip(i * splitIndex).Take(splitIndex).ToList();
+            }
+
+            string styleText = $"border:1px solid #ccc;padding:12px;border-radius:4px;max-width:{(numberOfColumns==1?700:60+270 * numberOfColumns)}px;";
+            
             <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId">
-                <div style="border:1px solid #ccc;padding:12px;border-radius:4px;max-width:900px;">
+                <div style=@styleText>
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
                         <strong>@device.Name (@device.DeviceType)</strong>
-                        <span style="color:gray;font-size:small;">@device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber → Proxy device @device.ProxyDeviceNumber</span>
+                        <span style="color:gray;font-size:small;">@device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber</span>
                         <RadzenButton Click="@(() => RemoveDevice(device))"
                                       Text="Remove"
                                       ButtonStyle="ButtonStyle.Danger"
@@ -144,18 +162,11 @@
                                           Size="ButtonSize.Small" />
                         </div>
 
-                        @{
-                            List<SelectiveLogMember> members = SelectiveLoggingMetadata.GetMembers(device.DeviceType).ToList();
-                            int splitIndex = (members.Count + 2) / 3;
-                            List<SelectiveLogMember> leftMembers = members.Take(splitIndex).ToList();
-                            IEnumerable<SelectiveLogMember> middleMembers = members.Skip(splitIndex).Take(splitIndex);
-                            List<SelectiveLogMember> rightMembers = members.Skip(splitIndex * 2).ToList();
-                        }
                         <div style="margin-top:8px;display:flex;gap:24px;align-items:flex-start;">
-                            <div style="flex:1;min-width:300px;">
-                                @foreach (SelectiveLogMember member in leftMembers)
+                            <div style="flex:1;min-width:270px;">
+                                @foreach (SelectiveLogMember member in columns[0])
                                 {
-                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:14px;">
                                         <RadzenCheckBox TValue="bool"
                                                         Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
                                                         ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
@@ -164,30 +175,66 @@
                                     </div>
                                 }
                             </div>
-                            <div style="flex:1;min-width:300px;">
-                                @foreach (SelectiveLogMember member in middleMembers)
-                                {
-                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                                        <RadzenCheckBox TValue="bool"
-                                                        Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
-                                                        ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
-                                                        Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
-                                        <label>@member.DisplayName</label>
-                                    </div>
-                                }
-                            </div>
-                            <div style="flex:1;min-width:300px;">
-                                @foreach (SelectiveLogMember member in rightMembers)
-                                {
-                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                                        <RadzenCheckBox TValue="bool"
-                                                        Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
-                                                        ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
-                                                        Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
-                                        <label>@member.DisplayName</label>
-                                    </div>
-                                }
-                            </div>
+                            @if (numberOfColumns > 1)
+                            {
+                                <div style="flex:1;min-width:270px;">
+                                    @foreach (SelectiveLogMember member in columns[1])
+                                    {
+                                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:14px;">
+                                            <RadzenCheckBox TValue="bool"
+                                                            Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
+                                                            ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
+                                                            Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
+                                            <label>@member.DisplayName</label>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            @if (numberOfColumns > 2)
+                            {
+                                <div style="flex:1;min-width:270px;">
+                                    @foreach (SelectiveLogMember member in columns[2])
+                                    {
+                                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:14px;">
+                                            <RadzenCheckBox TValue="bool"
+                                                            Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
+                                                            ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
+                                                            Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
+                                            <label>@member.DisplayName</label>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            @if (numberOfColumns > 3)
+                            {
+                                <div style="flex:1;min-width:270px;">
+                                    @foreach (SelectiveLogMember member in columns[3])
+                                    {
+                                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:14px;">
+                                            <RadzenCheckBox TValue="bool"
+                                                            Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
+                                                            ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
+                                                            Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
+                                            <label>@member.DisplayName</label>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            @if (numberOfColumns > 4)
+                            {
+                                <div style="flex:1;min-width:270px;">
+                                    @foreach (SelectiveLogMember member in columns[4])
+                                    {
+                                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:14px;">
+                                            <RadzenCheckBox TValue="bool"
+                                                            Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
+                                                            ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
+                                                            Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
+                                            <label>@member.DisplayName</label>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         </div>
                     </div>
                 </div>

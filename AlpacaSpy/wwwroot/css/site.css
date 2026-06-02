@@ -158,3 +158,10 @@ fieldset legend {
 .rz-chkbox-box {
     border-color: gray !important; /* your colour */
 }
+
+/* Change checkbox box size */
+.rz-chkbox-box {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 8px !important; /* controls tick size */
+}
