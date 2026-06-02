@@ -45,7 +45,7 @@ else
                               Text=@(state.Connected ? "Connected" : "Disconnected")
                               Style="width:165px;margin-left:0px; margin-right:0px; border-radius:20px; text-transform:none;"
                               ButtonStyle="@((state.Connected) ? ButtonStyle.Success : ButtonStyle.Danger)"
-                              Disabled="@(state.OperationUnderway || state.ConnectingToDevices)" />
+                              Disabled="@(state.OperationUnderway || state.ConnectingToDevices || state.DisplayRestartMessage)" />
             </div>
             <div style="color:white;font-size:small;justify-content:center;display:flex;margin-top:2px;margin-bottom:48px;">Click to change state</div>
 

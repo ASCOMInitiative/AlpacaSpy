@@ -6,8 +6,7 @@ namespace AlpacaSpy
     {
         PropertyGet,
         PropertySet,
-        Method,
-        Function
+        Method
     }
 
     public sealed record SelectiveLogMember(string MemberName, SelectiveLogMemberType MemberType)
@@ -15,8 +14,8 @@ namespace AlpacaSpy
         public string DisplayName => MemberType switch
         {
             SelectiveLogMemberType.Method => $"{MemberName}()",
-            SelectiveLogMemberType.PropertyGet => $"{MemberName} [get]",
-            SelectiveLogMemberType.PropertySet => $"{MemberName} [set]",
+            SelectiveLogMemberType.PropertyGet => $"{MemberName} (Get)",
+            SelectiveLogMemberType.PropertySet => $"{MemberName} (Set)",
             _ => MemberName
         };
 
@@ -302,9 +301,9 @@ namespace AlpacaSpy
                     new("UTCDate", SelectiveLogMemberType.PropertyGet),
                     new("UTCDate", SelectiveLogMemberType.PropertySet),
                     new("AbortSlew", SelectiveLogMemberType.Method),
-                    new("AxisRates", SelectiveLogMemberType.Function),
-                    new("CanMoveAxis", SelectiveLogMemberType.Function),
-                    new("DestinationSideOfPier", SelectiveLogMemberType.Function),
+                    new("AxisRates", SelectiveLogMemberType.Method),
+                    new("CanMoveAxis", SelectiveLogMemberType.Method),
+                    new("DestinationSideOfPier", SelectiveLogMemberType.Method),
                     new("FindHome", SelectiveLogMemberType.Method),
                     new("MoveAxis", SelectiveLogMemberType.Method),
                     new("Park", SelectiveLogMemberType.Method),
@@ -388,14 +387,14 @@ namespace AlpacaSpy
             return true;
         }
 
-        public static void EnableAllMembers(ConfiguredDevice device)
+        public static void EnableAllMembers(ConfiguredDevice device, AlpacaDeviceType deviceType)
         {
-            device.EnabledLogMembers = GetSelectionKeys(device.DeviceType).ToList();
+            device.EnabledLogMembers = GetSelectionKeys(deviceType).ToList();
         }
 
-        public static void DisableAllMembers(ConfiguredDevice device)
+        public static void ClearAllMembers(ConfiguredDevice device)
         {
-            device.EnabledLogMembers = new List<string>();
+            device.EnabledLogMembers = [];
         }
 
         public static SelectiveLogMemberType ResolveMemberType(AlpacaDeviceType deviceType, string memberName, string httpMethod)

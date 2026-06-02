@@ -3,6 +3,8 @@
 @inject Settings settings
 @inject AlpacaSpyLogger logger
 @inject IJSRuntime JSRuntime
+@inject DialogService DialogService
+
 @implements IAsyncDisposable
 
 <PageTitle>@Globals.APPLICATION_NAME - Setup</PageTitle>
@@ -27,13 +29,13 @@
 
     <div style="margin-left:auto;display:flex;gap:8px;justify-content:flex-end;">
         <RadzenButton Click="ClearDiscoveredDevicesAsync"
-                      Text="Clear discovered devices"
+                      Text="Clear discovered device list"
                       ButtonStyle="ButtonStyle.Warning"
                       Style="border-radius:20px; text-transform:none;"
-                      Disabled="@(_discoveryRunning || state.Connected)" />
+                      Disabled="@(_discoveryRunning)" />
 
-        <RadzenButton Click="ClearConfiguredDevicesAsync"
-                      Text="Clear configured devices"
+        <RadzenButton Click="DeleteAllConfiguredDevicesAsync"
+                      Text="Delete all configured devices"
                       ButtonStyle="ButtonStyle.Danger"
                       Style="border-radius:20px; text-transform:none;"
                       Disabled="@(_discoveryRunning || state.Connected)" />
@@ -97,16 +99,17 @@
         @foreach (var device in settings.ConfiguredDevices)
         {
             <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId">
-                <div style="border:1px solid #ccc;padding:12px;border-radius:4px;max-width:800px;">
+                <div style="border:1px solid #ccc;padding:12px;border-radius:4px;max-width:900px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
                         <strong>@device.Name (@device.DeviceType)</strong>
+                        <span style="color:gray;font-size:small;">@device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber → Proxy device @device.ProxyDeviceNumber</span>
                         <RadzenButton Click="@(() => RemoveDevice(device))"
                                       Text="Remove"
                                       ButtonStyle="ButtonStyle.Danger"
+                                      Style="border-radius:16px; text-transform:none;"
                                       Size="ButtonSize.Small"
                                       Disabled="@state.Connected" />
                     </div>
-                    <div style="color:gray;font-size:small;">@device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber → Proxy device @device.ProxyDeviceNumber</div>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
                         <RadzenCheckBox Value="device.LogClientHeaders"
                                         ValueChanged="@((bool v) => { device.LogClientHeaders = v; settings.Save(); })"
@@ -131,24 +134,59 @@
                             <RadzenButton Click="@(() => ClearAllSelected(device))"
                                           Text="Clear All"
                                           ButtonStyle="ButtonStyle.Primary"
+                                          Style="border-radius:16px; text-transform:none;"
                                           Size="ButtonSize.Small" />
                             <RadzenButton Click="@(() => SetAllSelected(device))"
                                           Text="Set All"
                                           ButtonStyle="ButtonStyle.Primary"
+                                          Style="border-radius:16px; text-transform:none;"
                                           Size="ButtonSize.Small" />
                         </div>
 
-                        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px;">
-                            @foreach (var member in SelectiveLoggingMetadata.GetMembers(device.DeviceType))
-                            {
-                                <div style="min-width:260px;display:flex;align-items:center;gap:8px;">
-                                    <RadzenCheckBox TValue="bool"
-                                                    Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
-                                                    ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
-                                                    Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
-                                    <label>@member.DisplayName</label>
-                                </div>
-                            }
+                        @{
+                            var members = SelectiveLoggingMetadata.GetMembers(device.DeviceType).ToList();
+                            var splitIndex = (members.Count + 2) / 3;
+                            var leftMembers = members.Take(splitIndex).ToList();
+                            var middleMembers = members.Skip(splitIndex).Take(splitIndex);
+                            var rightMembers = members.Skip(splitIndex * 2).ToList();
+                        }
+                        <div style="margin-top:8px;display:flex;gap:24px;align-items:flex-start;">
+                            <div style="flex:1;min-width:300px;">
+                                @foreach (var member in leftMembers)
+                                {
+                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                        <RadzenCheckBox TValue="bool"
+                                                        Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
+                                                        ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
+                                                        Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
+                                        <label>@member.DisplayName</label>
+                                    </div>
+                                }
+                            </div>
+                            <div style="flex:1;min-width:300px;">
+                                @foreach (var member in middleMembers)
+                                {
+                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                        <RadzenCheckBox TValue="bool"
+                                                        Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
+                                                        ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
+                                                        Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
+                                        <label>@member.DisplayName</label>
+                                    </div>
+                                }
+                            </div>
+                            <div style="flex:1;min-width:300px;">
+                                @foreach (var member in rightMembers)
+                                {
+                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                        <RadzenCheckBox TValue="bool"
+                                                        Value="@SelectiveLoggingMetadata.IsMemberEnabled(device, member)"
+                                                        ValueChanged="@((bool v) => UpdateMemberLogging(device, member, v))"
+                                                        Name="@($"{device.UniqueId}_{member.SelectionKey}")" />
+                                        <label>@member.DisplayName</label>
+                                    </div>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -204,17 +242,24 @@
         }
     }
 
-    private async Task ClearConfiguredDevicesAsync()
+    private async Task DeleteAllConfiguredDevicesAsync()
     {
         if (state.Connected)
             return;
-        bool confirm = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to clear all configured devices? This action cannot be undone.");
-        if (!confirm)
+
+        bool? confirmed = await DialogService.Confirm(
+            "Are you sure you want to delete all configured devices? This action cannot be undone, restart required.",
+            "Confirm Delete All",
+            new ConfirmOptions { OkButtonText = "Delete All", CancelButtonText = "Cancel" });
+
+        if (confirmed != true)
             return;
+
         settings.ConfiguredDevices.Clear();
         state.ConfiguredDevices.Clear();
         settings.Save();
         state.StatusText = "All configured devices have been cleared.";
+        state.DisplayRestartMessage = true;
     }
 
     private async Task ClearDiscoveredDevicesAsync()
@@ -227,15 +272,17 @@
 
     private async Task ClearAllSelected(ConfiguredDevice device)
     {
-        SelectiveLoggingMetadata.DisableAllMembers(device);
+        SelectiveLoggingMetadata.ClearAllMembers(device);
+        settings.Save();
     }
 
     private async Task SetAllSelected(ConfiguredDevice device)
     {
-        SelectiveLoggingMetadata.EnableAllMembers(device);
+        SelectiveLoggingMetadata.EnableAllMembers(device, device.DeviceType);
+        settings.Save();
     }
 
-    private void AddDevice(ASCOM.Alpaca.Discovery.AscomDevice device)
+    private async Task AddDevice(ASCOM.Alpaca.Discovery.AscomDevice device)
     {
         if (settings.ConfiguredDevices.Count >= Globals.MAX_CONFIGURED_DEVICES)
             return;
@@ -268,8 +315,16 @@
         state.StatusText = $"Added {newDevice.Name}. Restart required for changes to take effect.";
     }
 
-    private void RemoveDevice(ConfiguredDevice device)
+    private async Task RemoveDevice(ConfiguredDevice device)
     {
+        bool? confirmed = await DialogService.Confirm(
+            "Are you sure you want to remove this device? This action cannot be undone, restart required.",
+            "Confirm Remove",
+            new ConfirmOptions { OkButtonText = "Remove", CancelButtonText = "Cancel" });
+
+        if (confirmed != true)
+            return;
+
         settings.ConfiguredDevices.Remove(device);
         // Renumber remaining devices of the same type to ensure contiguous numbering, starting at 0
         foreach (AlpacaDeviceType type in Enum.GetValues<AlpacaDeviceType>())
@@ -283,7 +338,6 @@
                 if (configuredDevice.ProxyDeviceNumber != idx)
                 {
                     configuredDevice.ProxyDeviceNumber = idx;
-                    state.DisplayRestartMessage = true;
                 }
             }
         }
@@ -291,7 +345,8 @@
         state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
         settings.Save();
 
-        state.StatusText = $"Removed {device.Name}.";
+        state.DisplayRestartMessage = true;
+        state.StatusText = $"Removed {device.Name}. Restart required for changes to take effect.";
     }
 
     private void SaveSettings()

@@ -153,3 +153,8 @@ fieldset legend {
 .order-valid .rz-spinner-button {
     color: black;
 }
+
+/* Default (unchecked) outline colour */
+.rz-chkbox-box {
+    border-color: gray !important; /* your colour */
+}
