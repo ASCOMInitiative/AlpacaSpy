@@ -162,7 +162,7 @@ namespace AlpacaSpy
         public ushort ServerPort { get; set; } = (ushort)Globals.DEFAULT_ALPACA_PORT;
         public bool BindToAllNetworkAddresses { get; set; } = true;
         public bool AllowDiscovery { get; set; } = true;
-        public bool DiscoveryResponseOnlyOnLocalHost { get; set; } = true;
+        public bool SendDiscoveryResponsesOnAllNetworks { get; set; } = true;
         public bool RunInStrictAlpacaMode { get; set; } = true;
 
         public void ResetToDefaults()

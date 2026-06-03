@@ -14,7 +14,7 @@ namespace AlpacaSpy
         public bool AllowDiscovery => Program.settings.AllowDiscovery;
         public int ServerPort => Program.settings.ServerPort;
         public bool AllowRemoteAccess => Program.settings.BindToAllNetworkAddresses;
-        public bool LocalRespondOnlyToLocalHost => Program.settings.DiscoveryResponseOnlyOnLocalHost;
+        public bool LocalRespondOnlyToLocalHost => !Program.settings.SendDiscoveryResponsesOnAllNetworks;
         public bool RunSwagger => false;
     }
 }
