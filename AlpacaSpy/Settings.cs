@@ -149,7 +149,7 @@ namespace AlpacaSpy
         }
 
         public List<ConfiguredDevice> ConfiguredDevices { get; set; } = new();
-        public bool LogDiscoveryMessages { get; set; } = true;
+        public bool LogDiscoveryMessages { get; set; } = false;
         public bool StartBrowserOnLaunch { get; set; } = true;
         public double AlpacaDiscoveryDuration { get; set; } = Globals.ALPACA_DISCOVERY_DURATION_SECONDS;
         public int AlpacaGetPropertyTimeout { get; set; } = 2;

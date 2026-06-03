@@ -5,6 +5,8 @@
 @inject IJSRuntime JSRuntime
 @inject DialogService DialogService
 @using ASCOM.Alpaca.Discovery
+@using ASCOM.Common.Interfaces
+@using ASCOM.Common.Alpaca
 
 @implements IAsyncDisposable
 
@@ -78,7 +80,7 @@
                     <label>Auto-connect on startup</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <label style="width:120px;">Server Port:</label>
+                    <label style="width:160px;">Server Port:</label>
                     <RadzenNumeric TValue="int"
                                    @bind-Value="_serverPort"
                                    Min="1024"
@@ -87,12 +89,92 @@
                                    Style="width:100px;" />
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <label style="width:120px;">Logging Level:</label>
+                    <label style="width:160px;">Logging Level:</label>
                     <RadzenDropDown TValue="ASCOM.Common.Interfaces.LogLevel"
                                     Data="@_logLevels"
                                     @bind-Value="_logLevel"
                                     Style="width:180px;"
                                     Change="@(() => SaveSettings())" />
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:160px;">Location:</label>
+                    <RadzenTextBox TValue="string"
+                                   Value="@settings.Location"
+                                   ValueChanged="@((string v) => { settings.Location = v; SaveSettings(); })"
+                                   Style="width:220px;" />
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.LogDiscoveryMessages"
+                                    ValueChanged="@((bool v) => { settings.LogDiscoveryMessages = v; SaveSettings(); })"
+                                    Name="logDiscoveryMessages" />
+                    <label>Log discovery messages</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.StartBrowserOnLaunch"
+                                    ValueChanged="@((bool v) => { settings.StartBrowserOnLaunch = v; SaveSettings(); })"
+                                    Name="startBrowserOnLaunch" />
+                    <label>Start browser on launch</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:160px;">Discovery duration:</label>
+                    <RadzenNumeric TValue="double"
+                                   Value="@settings.AlpacaDiscoveryDuration"
+                                   ValueChanged="@((double v) => { settings.AlpacaDiscoveryDuration = v; SaveSettings(); })"
+                                   Min="1"
+                                   Style="width:100px;" />
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:160px;">Get timeout:</label>
+                    <RadzenNumeric TValue="int"
+                                   Value="@settings.AlpacaGetPropertyTimeout"
+                                   ValueChanged="@((int v) => { settings.AlpacaGetPropertyTimeout = v; SaveSettings(); })"
+                                   Min="1"
+                                   Style="width:100px;" />
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:160px;">Connect timeout:</label>
+                    <RadzenNumeric TValue="int"
+                                   Value="@settings.AlpacaConnectTimeout"
+                                   ValueChanged="@((int v) => { settings.AlpacaConnectTimeout = v; SaveSettings(); })"
+                                   Min="1"
+                                   Style="width:100px;" />
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.IncludeAlpacaTrace"
+                                    ValueChanged="@((bool v) => { settings.IncludeAlpacaTrace = v; SaveSettings(); })"
+                                    Name="includeAlpacaTrace" />
+                    <label>Include Alpaca trace</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.BindToAllNetworkAddresses"
+                                    ValueChanged="@((bool v) => { settings.BindToAllNetworkAddresses = v; SaveSettings(); })"
+                                    Name="bindToAllNetworkAddresses" />
+                    <label>Bind to all network addresses</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.AllowDiscovery"
+                                    ValueChanged="@((bool v) => { settings.AllowDiscovery = v; SaveSettings(); })"
+                                    Name="allowDiscovery" />
+                    <label>Allow discovery</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.DiscoveryResponseOnlyOnLocalHost"
+                                    ValueChanged="@((bool v) => { settings.DiscoveryResponseOnlyOnLocalHost = v; SaveSettings(); })"
+                                    Name="discoveryResponseOnlyOnLocalHost" />
+                    <label>Discovery response only on local host</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.RunInStrictAlpacaMode"
+                                    ValueChanged="@((bool v) => { settings.RunInStrictAlpacaMode = v; SaveSettings(); })"
+                                    Name="runInStrictAlpacaMode" />
+                    <label>Run in strict Alpaca mode</label>
                 </div>
             </div>
         </RadzenTabsItem>
@@ -115,8 +197,8 @@
                 columns[i] = members.Skip(i * splitIndex).Take(splitIndex).ToList();
             }
 
-            string styleText = $"border:1px solid #ccc;padding:12px;border-radius:4px;max-width:{(numberOfColumns==1?700:60+270 * numberOfColumns)}px;";
-            
+            string styleText = $"border:1px solid #ccc;padding:12px;border-radius:4px;max-width:{(numberOfColumns == 1 ? 700 : 60 + 270 * numberOfColumns)}px;";
+
             <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId">
                 <div style=@styleText>
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
@@ -247,8 +329,8 @@
     private bool _discoveryRunning;
     private int _serverPort;
     private bool _autoConnect;
-    private ASCOM.Common.Interfaces.LogLevel _logLevel;
-    private readonly ASCOM.Common.Interfaces.LogLevel[] _logLevels = Enum.GetValues<ASCOM.Common.Interfaces.LogLevel>();
+    private LogLevel _logLevel;
+    private readonly LogLevel[] _logLevels = Enum.GetValues<LogLevel>();
 
     protected override void OnInitialized()
     {
@@ -268,13 +350,20 @@
         await InvokeAsync(StateHasChanged);
         try
         {
-            List<AscomDevice> devices = await AlpacaDiscovery.GetAscomDevicesAsync(null, 1, 100, 32227, settings.AlpacaDiscoveryDuration, false, true, false, ASCOM.Common.Alpaca.ServiceType.Http, logger, CancellationToken.None);
+            // Get a list of devices that are available on the network
+            List<AscomDevice> devices = await AlpacaDiscovery.GetAscomDevicesAsync(null, 1, 100, 32227, settings.AlpacaDiscoveryDuration, false, true, false, ServiceType.Http, settings.LogLevel < LogLevel.Information ? logger : null, CancellationToken.None);
+
+            // Remove our own AlpacaSpy devices from the list, we don't want to proxy ourselves!
             devices.RemoveAll(d => d.AscomDeviceName.StartsWith(Globals.APPLICATION_SHORT_NAME));
+
+            // Update the list of discovered devices
             lock (state.DiscoveredDevicesLock)
             {
                 state.DiscoveredDevices.Clear();
                 state.DiscoveredDevices.AddRange(devices);
             }
+
+            // Log the completion
             state.DiscoveryHasRun = true;
             state.StatusText = $"Found {state.DiscoveredDevices.Count} device(s) at {DateTime.Now:HH:mm:ss}.";
             logger.LogMessage("Discovery", $"Found {state.DiscoveredDevices.Count} Alpaca device(s).");
