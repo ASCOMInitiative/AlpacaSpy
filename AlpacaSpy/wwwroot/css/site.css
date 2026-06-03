@@ -165,3 +165,11 @@ fieldset legend {
     height: 18px !important;
     font-size: 8px !important; /* controls tick size */
 }
+
+.rz-tabview-nav li .rz-tabview-link {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    min-height: 48px; /* Optional: Adjusts the height to ensure enough vertical space */
+}

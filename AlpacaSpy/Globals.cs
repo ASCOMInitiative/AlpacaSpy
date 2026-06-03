@@ -14,8 +14,8 @@ namespace AlpacaSpy
         internal const string LOG_FILENAME = "alpacaspy.log";
         internal const string WELCOME_MESSAGE = $"Welcome to {APPLICATION_NAME}!";
         internal const int DEFAULT_ALPACA_PORT = 32325;
-        internal const int MAXIMUM_LOG_SIZE_CHARACTERS = 60000;
-        internal const int LOG_TRUNCATION_CHARACTERS = 6000;
+        internal const int MAXIMUM_LOG_SIZE_CHARACTERS = 120000;
+        internal const int LOG_TRUNCATION_CHARACTERS = 12000;
         internal const string DISCOVERY_PACKET_MESSAGE = "Received a discovery packet from";
         internal const int APPLICATION_SHUTDOWN_TIMEOUT = 5;
         internal const int WEBSOCKET_CLOSE_TIMEOUT = 5;
@@ -29,13 +29,13 @@ namespace AlpacaSpy
         internal static readonly Dictionary<AlpacaDeviceType, int> DevicetypeDisplayColumns = new()
         {
             { AlpacaDeviceType.Camera, 5 },
-            { AlpacaDeviceType.CoverCalibrator, 2 },
+            { AlpacaDeviceType.CoverCalibrator, 3 },
             { AlpacaDeviceType.Dome, 3 },
-            { AlpacaDeviceType.FilterWheel, 2 },
-            { AlpacaDeviceType.Focuser, 2 },
-            { AlpacaDeviceType.ObservingConditions, 2 },
-            { AlpacaDeviceType.Rotator, 2 },
-            { AlpacaDeviceType.SafetyMonitor, 2 },
+            { AlpacaDeviceType.FilterWheel, 3 },
+            { AlpacaDeviceType.Focuser, 3 },
+            { AlpacaDeviceType.ObservingConditions, 3 },
+            { AlpacaDeviceType.Rotator, 3 },
+            { AlpacaDeviceType.SafetyMonitor, 3 },
             { AlpacaDeviceType.Switch, 3 },
             { AlpacaDeviceType.Telescope, 5 }
         };

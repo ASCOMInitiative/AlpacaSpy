@@ -16,7 +16,7 @@
     <PackageReference Include="ASCOM.Alpaca.Components" Version="4.0.0-rc.1" />
     <PackageReference Include="ASCOM.Alpaca.Razor" Version="0.6.0-alpha02" />
     <PackageReference Include="ASCOM.Tools" Version="4.0.0-rc.1" />
-    <PackageReference Include="Radzen.Blazor" Version="10.3.2" />
+    <PackageReference Include="Radzen.Blazor" Version="10.4.7" />
   </ItemGroup>
 
 </Project>

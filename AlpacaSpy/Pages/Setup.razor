@@ -22,8 +22,6 @@
                       Style="border-radius:20px; text-transform:none;"
                       Disabled="@(_discoveryRunning || state.Connected)" />
 
-        <span>@state.StatusText</span>
-
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
             <RadzenButton Click="ClearDiscoveredDevicesAsync"
                           Text="Clear discovered devices"
@@ -48,6 +46,13 @@
     @if (state.Connected)
     {
         <div style="margin-top:20px;margin-bottom:20px;font-weight:bold;font-size:large; color:red;">Device state must be "Disconnected" in order to configure Settings and Proxy devices.</div>
+    }
+
+    <p>@state.StatusText</p>
+
+    @if (_discoveryRunning)
+    {
+        <span>Searching for Alpaca devices...</span>
     }
 
 </div>
@@ -80,7 +85,7 @@
 <h4 style="margin-top:24px;">Settings</h4>
 <RadzenTabs>
     <Tabs>
-        <RadzenTabsItem Text="Settings" Disabled="@state.Connected">
+        <RadzenTabsItem Text="Settings">
             <div style="display:flex;flex-direction:column;gap:8px;max-width:400px;">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
@@ -223,39 +228,48 @@
 
             string styleText = $"border:1px solid #ccc;padding:12px;border-radius:4px;max-width:{(numberOfColumns == 1 ? 700 : 60 + 270 * numberOfColumns)}px;";
 
-            <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId">
+                <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId" Style="--rz-tabs-tab-display: inline-flex; --rz-tabs-tab-align-items: center;">
                 <div style=@styleText>
-                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-                        <strong>@device.Name (@device.DeviceType)</strong>
-                        <span style="color:gray;font-size:small;">@device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber</span>
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                        <span style="font-size:20px;font-weight:bold;">@device.Name</span>
+                        <span style="color:gray;font-size:15px;">(@device.DeviceType) @device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber</span>
                         <RadzenButton Click="@(() => RemoveDevice(device))"
                                       Text="Remove"
                                       ButtonStyle="ButtonStyle.Danger"
-                                      Style="border-radius:16px; text-transform:none;"
+                                      Style="margin-left:auto;border-radius:16px; text-transform:none;"
                                       Size="ButtonSize.Small"
                                       Disabled="@state.Connected" />
                     </div>
+                    <strong style="margin-right:auto;">Header and parameter logging</strong>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                        <RadzenCheckBox Value="device.LogClientHeaders"
-                                        ValueChanged="@((bool v) => { device.LogClientHeaders = v; settings.Save(); })"
-                                        Name="@($"lch_{device.UniqueId}")" />
-                        <label>Log client headers</label>
-                        <RadzenCheckBox Value="device.LogClientParams"
-                                        ValueChanged="@((bool v) => { device.LogClientParams = v; settings.Save(); })"
-                                        Name="@($"lcq_{device.UniqueId}")" />
-                        <label>Log client parameters</label>
-                        <RadzenCheckBox Value="device.LogDeviceHeaders"
-                                        ValueChanged="@((bool v) => { device.LogDeviceHeaders = v; settings.Save(); })"
-                                        Name="@($"ldh_{device.UniqueId}")" />
-                        <label>Log device headers</label>
-                        <RadzenCheckBox Value="device.LogJsonParameters"
-                                        ValueChanged="@((bool v) => { device.LogJsonParameters = v; settings.Save(); })"
-                                        Name="@($"ljp_{device.UniqueId}")" />
-                        <label>Log JSON parameters</label>
+                        <span style="min-width:205px;">
+                            <RadzenCheckBox Value="device.LogClientHeaders"
+                                            ValueChanged="@((bool v) => { device.LogClientHeaders = v; settings.Save(); })"
+                                            Name="@($"lch_{device.UniqueId}")" />
+                            <label>Headers to device</label>
+                        </span>
+                        <span style="min-width:205px;">
+                            <RadzenCheckBox Value="device.LogClientParams"
+                                            ValueChanged="@((bool v) => { device.LogClientParams = v; settings.Save(); })"
+                                            Name="@($"lcq_{device.UniqueId}")" />
+                            <label>Parameters to device</label>
+                        </span>
+                        <span style="min-width:205px;">
+                            <RadzenCheckBox Value="device.LogDeviceHeaders"
+                                            ValueChanged="@((bool v) => { device.LogDeviceHeaders = v; settings.Save(); })"
+                                            Name="@($"ldh_{device.UniqueId}")" />
+                            <label>Headers from device</label>
+                        </span>
+                        <span style="min-width:205px;">
+                            <RadzenCheckBox Value="device.LogJsonParameters"
+                                            ValueChanged="@((bool v) => { device.LogJsonParameters = v; settings.Save(); })"
+                                            Name="@($"ljp_{device.UniqueId}")" />
+                            <label>JSON from device</label>
+                        </span>
                     </div>
                     <div style="margin-top:16px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-                            <strong style="margin-right:auto;">Selective logging</strong>
+                            <strong style="margin-right:auto;">Member logging</strong>
                             <RadzenButton Click="@(() => ClearAllSelected(device))"
                                           Text="Clear All"
                                           ButtonStyle="ButtonStyle.Primary"
