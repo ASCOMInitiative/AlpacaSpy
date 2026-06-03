@@ -14,7 +14,7 @@
 <h3>Device Discovery and Configuration</h3>
 @if (state.Connected)
 {
-    <div style="margin-top:20px;margin-bottom:20px;font-weight:bold;font-size:large; color:red;">Device state must be "Disconnected" in order to configure Proxy devices.</div>
+    <div style="margin-top:20px;margin-bottom:20px;font-weight:bold;font-size:large; color:red;">Device state must be "Disconnected" in order to configure Settings and Proxy devices.</div>
 }
 <p>@state.StatusText</p>
 
@@ -32,13 +32,19 @@
 
     <div style="margin-left:auto;display:flex;gap:8px;justify-content:flex-end;">
         <RadzenButton Click="ClearDiscoveredDevicesAsync"
-                      Text="Clear discovered device list"
+                      Text="Clear discovered devices"
                       ButtonStyle="ButtonStyle.Warning"
                       Style="border-radius:20px; text-transform:none;"
                       Disabled="@(_discoveryRunning)" />
 
         <RadzenButton Click="DeleteAllConfiguredDevicesAsync"
-                      Text="Delete all configured devices"
+                      Text="Delete all devices"
+                      ButtonStyle="ButtonStyle.Danger"
+                      Style="border-radius:20px; text-transform:none;"
+                      Disabled="@(_discoveryRunning || state.Connected)" />
+
+        <RadzenButton Click="ResetSettingsAsync"
+                      Text="Reset All Settings"
                       ButtonStyle="ButtonStyle.Danger"
                       Style="border-radius:20px; text-transform:none;"
                       Disabled="@(_discoveryRunning || state.Connected)" />
@@ -70,12 +76,13 @@
 <h4 style="margin-top:24px;">Settings</h4>
 <RadzenTabs>
     <Tabs>
-        <RadzenTabsItem Text="Settings">
+        <RadzenTabsItem Text="Settings" Disabled="@state.Connected">
             <div style="display:flex;flex-direction:column;gap:8px;max-width:400px;">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
                                     Value="_autoConnect"
                                     ValueChanged="@((bool v) => { _autoConnect = v; SaveSettings(); })"
+                                    Disabled="@state.Connected"
                                     Name="autoConnect" />
                     <label>Auto-connect on startup</label>
                 </div>
@@ -86,6 +93,7 @@
                                    Min="1024"
                                    Max="65535"
                                    Change="@(() => SaveSettings())"
+                                   Disabled="@state.Connected"
                                    Style="width:100px;" />
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -94,6 +102,7 @@
                                     Data="@_logLevels"
                                     @bind-Value="_logLevel"
                                     Style="width:180px;"
+                                    Disabled="@state.Connected"
                                     Change="@(() => SaveSettings())" />
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -101,12 +110,14 @@
                     <RadzenTextBox TValue="string"
                                    Value="@settings.Location"
                                    ValueChanged="@((string v) => { settings.Location = v; SaveSettings(); })"
+                                   Disabled="@state.Connected"
                                    Style="width:220px;" />
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
                                     Value="@settings.LogDiscoveryMessages"
                                     ValueChanged="@((bool v) => { settings.LogDiscoveryMessages = v; SaveSettings(); })"
+                                    Disabled="@state.Connected"
                                     Name="logDiscoveryMessages" />
                     <label>Log discovery messages</label>
                 </div>
@@ -114,6 +125,7 @@
                     <RadzenCheckBox TValue="bool"
                                     Value="@settings.StartBrowserOnLaunch"
                                     ValueChanged="@((bool v) => { settings.StartBrowserOnLaunch = v; SaveSettings(); })"
+                                    Disabled="@state.Connected"
                                     Name="startBrowserOnLaunch" />
                     <label>Start browser on launch</label>
                 </div>
@@ -123,6 +135,7 @@
                                    Value="@settings.AlpacaDiscoveryDuration"
                                    ValueChanged="@((double v) => { settings.AlpacaDiscoveryDuration = v; SaveSettings(); })"
                                    Min="1"
+                                   Disabled="@state.Connected"
                                    Style="width:100px;" />
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -131,6 +144,7 @@
                                    Value="@settings.AlpacaGetPropertyTimeout"
                                    ValueChanged="@((int v) => { settings.AlpacaGetPropertyTimeout = v; SaveSettings(); })"
                                    Min="1"
+                                   Disabled="@state.Connected"
                                    Style="width:100px;" />
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -139,12 +153,14 @@
                                    Value="@settings.AlpacaConnectTimeout"
                                    ValueChanged="@((int v) => { settings.AlpacaConnectTimeout = v; SaveSettings(); })"
                                    Min="1"
+                                   Disabled="@state.Connected"
                                    Style="width:100px;" />
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
                                     Value="@settings.IncludeAlpacaTrace"
                                     ValueChanged="@((bool v) => { settings.IncludeAlpacaTrace = v; SaveSettings(); })"
+                                    Disabled="@state.Connected"
                                     Name="includeAlpacaTrace" />
                     <label>Include Alpaca trace</label>
                 </div>
@@ -152,6 +168,7 @@
                     <RadzenCheckBox TValue="bool"
                                     Value="@settings.BindToAllNetworkAddresses"
                                     ValueChanged="@((bool v) => { settings.BindToAllNetworkAddresses = v; SaveSettings(); })"
+                                    Disabled="@state.Connected"
                                     Name="bindToAllNetworkAddresses" />
                     <label>Bind to all network addresses</label>
                 </div>
@@ -159,6 +176,7 @@
                     <RadzenCheckBox TValue="bool"
                                     Value="@settings.AllowDiscovery"
                                     ValueChanged="@((bool v) => { settings.AllowDiscovery = v; SaveSettings(); })"
+                                    Disabled="@state.Connected"
                                     Name="allowDiscovery" />
                     <label>Allow discovery</label>
                 </div>
@@ -166,6 +184,7 @@
                     <RadzenCheckBox TValue="bool"
                                     Value="@settings.DiscoveryResponseOnlyOnLocalHost"
                                     ValueChanged="@((bool v) => { settings.DiscoveryResponseOnlyOnLocalHost = v; SaveSettings(); })"
+                                    Disabled="@state.Connected"
                                     Name="discoveryResponseOnlyOnLocalHost" />
                     <label>Discovery response only on local host</label>
                 </div>
@@ -173,6 +192,7 @@
                     <RadzenCheckBox TValue="bool"
                                     Value="@settings.RunInStrictAlpacaMode"
                                     ValueChanged="@((bool v) => { settings.RunInStrictAlpacaMode = v; SaveSettings(); })"
+                                    Disabled="@state.Connected"
                                     Name="runInStrictAlpacaMode" />
                     <label>Run in strict Alpaca mode</label>
                 </div>
@@ -412,6 +432,24 @@
     {
         SelectiveLoggingMetadata.ClearAllMembers(device);
         settings.Save();
+    }
+
+    private async Task ResetSettingsAsync()
+    {
+        if (state.Connected)
+            return;
+
+        bool? confirmed = await DialogService.Confirm(
+            "Are you sure you want to reset all settings to their defaults? This action cannot be undone, restart required.",
+            "Confirm Reset Settings", new ConfirmOptions { OkButtonText = "Reset", CancelButtonText = "Cancel" });
+
+        if (confirmed != true)
+            return;
+
+        settings.ResetToDefaults();
+        state.ResetState();
+        state.StatusText = "All settings have been reset to their defaults.";
+        state.DisplayRestartMessage = true;
     }
 
     private async Task SetAllSelected(ConfiguredDevice device)

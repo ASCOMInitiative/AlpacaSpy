@@ -66,11 +66,11 @@ namespace AlpacaSpy
             OperationUnderway = false;
             OperationUnderwayMessage = "Operation Underway";
             ConnectingToDevices = false;
-            ApplicationLog = new StringBuilder(Globals.MAXIMUM_LOG_SIZE_CHARACTERS, Globals.MAXIMUM_LOG_SIZE_CHARACTERS)
-                .Append($"{Globals.WELCOME_MESSAGE}\r\n");
+            ApplicationLog = new StringBuilder(Globals.MAXIMUM_LOG_SIZE_CHARACTERS, Globals.MAXIMUM_LOG_SIZE_CHARACTERS).Append($"{Globals.WELCOME_MESSAGE}\r\n");
             ConfiguredDevices = new List<ConfiguredDevice>();
             ProxyDevices = new List<object>();
             foreach (TraceLogger tl in DeviceLoggers.Values) try { tl.Dispose(); } catch { }
+            foreach (IDisposable device in ProxyDevices) try { device.Dispose(); } catch { }
             DeviceLoggers = new Dictionary<string, TraceLogger>();
             lock (DiscoveredDevicesLock)
             {

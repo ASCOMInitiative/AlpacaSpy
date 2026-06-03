@@ -167,6 +167,15 @@ namespace AlpacaSpy
 
             app.Run();
 
+            // Clear the proxy devices to release any file locks before attempting restart
+            foreach (IDisposable device in state.ProxyDevices) try { device.Dispose(); } catch { }
+            state.ProxyDevices.Clear();
+
+            //Clear the device loggers to release file locks before attempting restart
+            foreach (TraceLogger deviceLogger in state.DeviceLoggers.Values) try { deviceLogger.Dispose(); } catch { }
+            state.DeviceLoggers.Clear();
+
+            // If a restart was requested, wait a moment for the current process to exit before starting a new instance
             if (RestartRequested)
             {
                 try
@@ -204,16 +213,16 @@ namespace AlpacaSpy
                     // DeviceManager (serves Alpaca HTTP) and state.ProxyDevices (managed by ConnectionManager).
                     object proxy = config.DeviceType switch
                     {
-                        Models.AlpacaDeviceType.Camera => new ProxyDevices.ProxyCamera(config, state, logger),
-                        Models.AlpacaDeviceType.CoverCalibrator => new ProxyDevices.ProxyCoverCalibrator(config, state, logger),
-                        Models.AlpacaDeviceType.Dome => new ProxyDevices.ProxyDome(config, state, logger),
-                        Models.AlpacaDeviceType.FilterWheel => new ProxyDevices.ProxyFilterWheel(config, state, logger),
-                        Models.AlpacaDeviceType.Focuser => new ProxyDevices.ProxyFocuser(config, state, logger),
-                        Models.AlpacaDeviceType.ObservingConditions => new ProxyDevices.ProxyObservingConditions(config, state, logger),
-                        Models.AlpacaDeviceType.Rotator => new ProxyDevices.ProxyRotator(config, state, logger),
-                        Models.AlpacaDeviceType.SafetyMonitor => new ProxyDevices.ProxySafetyMonitor(config, state, logger),
-                        Models.AlpacaDeviceType.Switch => new ProxyDevices.ProxySwitch(config, state, logger),
-                        Models.AlpacaDeviceType.Telescope => new ProxyDevices.ProxyTelescope(config, state, logger),
+                        Models.AlpacaDeviceType.Camera => new ProxyDevices.ProxyCamera(config, state, settings, logger),
+                        Models.AlpacaDeviceType.CoverCalibrator => new ProxyDevices.ProxyCoverCalibrator(config, state, settings, logger),
+                        Models.AlpacaDeviceType.Dome => new ProxyDevices.ProxyDome(config, state, settings, logger),
+                        Models.AlpacaDeviceType.FilterWheel => new ProxyDevices.ProxyFilterWheel(config, state, settings, logger),
+                        Models.AlpacaDeviceType.Focuser => new ProxyDevices.ProxyFocuser(config, state, settings, logger),
+                        Models.AlpacaDeviceType.ObservingConditions => new ProxyDevices.ProxyObservingConditions(config, state, settings, logger),
+                        Models.AlpacaDeviceType.Rotator => new ProxyDevices.ProxyRotator(config, state, settings, logger),
+                        Models.AlpacaDeviceType.SafetyMonitor => new ProxyDevices.ProxySafetyMonitor(config, state, settings, logger),
+                        Models.AlpacaDeviceType.Switch => new ProxyDevices.ProxySwitch(config, state, settings, logger),
+                        Models.AlpacaDeviceType.Telescope => new ProxyDevices.ProxyTelescope(config, state, settings, logger),
                         _ => throw new ArgumentOutOfRangeException(nameof(config.DeviceType), config.DeviceType, "Unknown device type")
                     };
 
@@ -275,7 +284,7 @@ namespace AlpacaSpy
             });
         }
 
-        private static Microsoft.Extensions.Logging.LogLevel ToMicrosoftLogLevel(ASCOM.Common.Interfaces.LogLevel logLevel)
+        private static LogLevel ToMicrosoftLogLevel(ASCOM.Common.Interfaces.LogLevel logLevel)
         {
             return logLevel switch
             {

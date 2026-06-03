@@ -1,6 +1,7 @@
 using AlpacaSpy.Models;
 using ASCOM;
 using ASCOM.Alpaca.Clients;
+using ASCOM.Common.Alpaca;
 using ASCOM.Common.DeviceInterfaces;
 
 namespace AlpacaSpy.ProxyDevices
@@ -9,15 +10,17 @@ namespace AlpacaSpy.ProxyDevices
     {
         private readonly ConfiguredDevice _config;
         private readonly State _state;
+        private readonly Settings _settings;
         private readonly AlpacaSpyLogger _logger;
         private AlpacaCamera? _client;
 
         private AlpacaCamera Client => _client ?? throw new NotConnectedException($"Not connected to {_config.Name}");
 
-        public ProxyCamera(ConfiguredDevice config, State state, AlpacaSpyLogger logger)
+        public ProxyCamera(ConfiguredDevice config, State state, Settings settings, AlpacaSpyLogger logger)
         {
             _config = config;
             _state = state;
+            _settings = settings;
             _logger = logger;
         }
 
@@ -25,7 +28,7 @@ namespace AlpacaSpy.ProxyDevices
         {
             if (_client?.Connected == true) return;
             DisconnectDevice();
-            _client = new AlpacaCamera(ASCOM.Common.Alpaca.ServiceType.Http, _config.IpAddress, _config.PortNumber, _config.RemoteDeviceNumber, false, null);
+            _client = new AlpacaCamera(ServiceType.Http, _config.IpAddress, _config.PortNumber, _config.RemoteDeviceNumber, false, _settings.LogLevel < ASCOM.Common.Interfaces.LogLevel.Information ? _logger : null);
             _client.Connected = true;
         }
 
