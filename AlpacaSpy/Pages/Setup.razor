@@ -22,6 +22,8 @@
                       Style="border-radius:20px; text-transform:none;"
                       Disabled="@(_discoveryRunning || state.Connected)" />
 
+        <span>@state.StatusText</span>
+
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
             <RadzenButton Click="ClearDiscoveredDevicesAsync"
                           Text="Clear discovered devices"
@@ -48,12 +50,6 @@
         <div style="margin-top:20px;margin-bottom:20px;font-weight:bold;font-size:large; color:red;">Device state must be "Disconnected" in order to configure Settings and Proxy devices.</div>
     }
 
-    <p>@state.StatusText</p>
-
-    @if (_discoveryRunning)
-    {
-        <span>Searching for Alpaca devices...</span>
-    }
 
 </div>
 

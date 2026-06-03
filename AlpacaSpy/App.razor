@@ -14,9 +14,8 @@
 </Router>
 <HeadContent>
     <RadzenTheme Theme="standard" />
+    <link href="css/site.css" rel="stylesheet" />
 </HeadContent>
-
-<script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
 
 <script>
     let dotNetHelperIndexPage;
@@ -69,3 +68,5 @@
         return top;
     };
 </script>
+
+<script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
