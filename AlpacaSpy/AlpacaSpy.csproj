@@ -1,15 +1,83 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <Target Name="Test" AfterTargets="AfterBuild">
+    <Message Importance="High" Text=" " />
+    <Message Importance="High" Text="Version: $(ProductMajor).$(ProductMinor).$(ProductPatch).$(BuildNumber)" />
+    <Message Importance="High" Text="InformationalVersion: $(InformationalVersion)" />
+    <Message Importance="High" Text=" " />
+  </Target>
+  <Target Name="WriteInformationVersion" AfterTargets="CopyFilesToOutputDirectory">
+    <PropertyGroup>
+      <InfoVersion>$(ProductMajor).$(ProductMinor).$(ProductPatch)$(ProductPreReleaseSeparator)$(ProductPreRelease)+$(BuildNumber)</InfoVersion>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(PublishDir)..\InformationVersion.txt" Overwrite="true" Lines="$(InfoVersion)" />
+  </Target>
+
+  <PropertyGroup>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <Target Name="AddGitShaToInformationVersion" AfterTargets="GetAssemblyVersion" Returns="InformationalVersion">
+    <Exec ConsoleToMsBuild="true" Command="git rev-parse --short HEAD">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitSha" />
+    </Exec>
+    <PropertyGroup>
+      <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+      <InformationalVersion>$(InformationalVersion).$(GitSha)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
+
+  <PropertyGroup>
+    <!-- Set version numbers -->
+    <ProductMajor>0</ProductMajor>
+    <ProductMinor>9</ProductMinor>
+    <ProductPatch>0</ProductPatch>
+
+    <!-- Set the prerelease string without a leading minus e.g. rc.1 or leave empty for a production release -->
+    <ProductPreRelease>rc.1</ProductPreRelease>
+
+    <!--Create a dynamic revision number based on time of build
+		 
+		The revision number is calculated by using the lowest 5 bits (0::31) to store the build hour (0::23) and the upper 11 bits to store the build day since the 1st January 2022.
+		This approach gives a revision number that changes every hour and that only repeats after 2048 days (over 5 years). 
+		To simplify the formula, years are assumed to be 366 days in length and UTC is used for the time of day so that daylight savings time changes can be ignored. -->
+
+    <BuildNumber>$([MSBuild]::Add($([MSBuild]::Multiply($([MSBuild]::Modulo($([MSBuild]::Add($([MSBuild]::Multiply($([MSBuild]::Subtract($([System.DateTime]::UtcNow.Year),2022)),366)),$([System.DateTime]::UtcNow.DayOfYear))),2048)),32)),$([System.DateTime]::UtcNow.TimeOfDay.Hours)))</BuildNumber>
+  </PropertyGroup>
+
+  <!-- Create the prerelease string minus character separator if this is a pre-release -->
+  <PropertyGroup Condition="'$(ProductPreRelease)'!=''">
+    <ProductPreReleaseSeparator>-</ProductPreReleaseSeparator>
+  </PropertyGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0-alpha</InformationalVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\AlpacaSpy.xml</DocumentationFile>
     <NoWarn>1591</NoWarn>
+
+    <Product>ASCOM AlpacaSpy</Product>
+    <ProductName>ASCOM AlpacaSpy</ProductName>
+    <Company>ASCOM Initiative</Company>
+    <Copyright>© Peter Simpson 2026</Copyright>
+    
+    <Version>$(ProductMajor).$(ProductMinor).$(ProductPatch).$(BuildNumber)</Version>
+    <AssemblyVersion>$(ProductMajor).$(ProductMinor).$(ProductPatch).$(BuildNumber)</AssemblyVersion>
+    <FileVersion>$(ProductMajor).$(ProductMinor).$(ProductPatch).$(BuildNumber)</FileVersion>
+
+    <!--Set the product version to the SEMVER version string -->
+    <InformationalVersion>$(ProductMajor).$(ProductMinor).$(ProductPatch)$(ProductPreReleaseSeparator)$(ProductPreRelease)+$(BuildNumber)</InformationalVersion>
+
+    <AssemblyName>alpacaspy</AssemblyName>
+    <AssemblyCompany>ASCOM Initiative</AssemblyCompany>
+    <AssemblyProduct>ASCOM AlpacaSpy</AssemblyProduct>
+    <AssemblyTitle>ASCOM AlpacaSpy</AssemblyTitle>
+    <AssemblyConfiguration>$(Configuration)</AssemblyConfiguration>
+    <AssemblyDescription>ASCOM AlpacaSpy</AssemblyDescription>
+    <SignAssembly>false</SignAssembly>
   </PropertyGroup>
 
   <ItemGroup>
