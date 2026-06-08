@@ -46,22 +46,31 @@
     {
         if (firstRender)
         {
-            objRef = DotNetObjectReference.Create(this);
-            await JSRuntime.InvokeVoidAsync("window.registerIndexViewportChangeCallback", objRef);
-
-            int logWidth = await JSRuntime.InvokeAsync<int>("eval", "window.innerWidth");
-            int logHeight = await JSRuntime.InvokeAsync<int>("eval", "window.innerHeight");
-            await OnResizeIndex(logWidth, logHeight);
-
-            logger.LogBlankLine();
-            await JSRuntime.InvokeVoidAsync("ScrollToBottom", "AlpacaSpyLog");
             _ = LogRefreshLoopAsync(_cts.Token);
+
+            try
+            {
+                objRef = DotNetObjectReference.Create(this);
+                await JSRuntime.InvokeVoidAsync("window.registerIndexViewportChangeCallback", objRef);
+                logger.LogBlankLine();
+                await ScrollLogToBottomAsync();
+            }
+            catch (InvalidOperationException ex)
+            {
+                logger.LogWarning("Index", $"Interactive startup is not ready: {ex.Message}");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (TaskCanceledException)
+            {
+            }
         }
 
         if (_logContentChanged)
         {
             _logContentChanged = false;
-            await JSRuntime.InvokeVoidAsync("ScrollToBottom", "AlpacaSpyLog");
+            await ScrollLogToBottomAsync();
         }
     }
 
@@ -150,11 +159,29 @@
         try
         {
             await InvokeAsync(StateHasChanged);
-            await JSRuntime.InvokeVoidAsync("ScrollToBottom", "AlpacaSpyLog");
+            await ScrollLogToBottomAsync();
         }
         catch (Exception ex)
         {
             logger.LogError("OnResize", $"Exception - {ex.Message}\r\n{ex}");
+        }
+    }
+
+    private async Task ScrollLogToBottomAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("ScrollToBottom", "AlpacaSpyLog");
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning("Index", $"Log scroll is not ready: {ex.Message}");
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (TaskCanceledException)
+        {
         }
     }
 
@@ -172,7 +199,14 @@
             {
                 await JSRuntime.InvokeVoidAsync("window.unregisterIndexViewportChangeCallback");
             }
-            catch
+            catch (InvalidOperationException ex)
+            {
+                logger.LogWarning("Index", $"Viewport cleanup is not ready: {ex.Message}");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (TaskCanceledException)
             {
             }
             objRef.Dispose();

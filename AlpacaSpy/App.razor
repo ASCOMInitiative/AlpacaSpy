@@ -1,20 +1,30 @@
 @namespace AlpacaSpy
 
-<Router AppAssembly="@typeof(App).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <PageTitle>Not found</PageTitle>
+<ErrorBoundary>
+    <ChildContent>
+        <Router AppAssembly="@typeof(App).Assembly">
+            <Found Context="routeData">
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </Found>
+            <NotFound>
+                <PageTitle>Not found</PageTitle>
+                <LayoutView Layout="@typeof(MainLayout)">
+                    <p role="alert">Sorry, there's nothing at this address.</p>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </ChildContent>
+    <ErrorContent>
         <LayoutView Layout="@typeof(MainLayout)">
-            <p role="alert">Sorry, there's nothing at this address.</p>
+            <div class="blazor-error-boundary">
+                A page error has occurred. Check the application log for details.
+            </div>
         </LayoutView>
-    </NotFound>
-</Router>
+    </ErrorContent>
+</ErrorBoundary>
 <HeadContent>
     <RadzenTheme Theme="standard" />
-    <link href="css/site.css" rel="stylesheet" />
 </HeadContent>
 
 <script>
@@ -27,15 +37,13 @@
     }
 
     window.registerIndexViewportChangeCallback = (dotnetHelperObject) => {
-        window.addEventListener('load', onResizeIndex);
+        dotNetHelperIndexPage = dotnetHelperObject;
         window.addEventListener('resize', onResizeIndex);
-        window.dotNetHelperIndexPage = dotnetHelperObject;
     }
 
     window.unregisterIndexViewportChangeCallback = () => {
-        window.removeEventListener('load', onResizeIndex);
         window.removeEventListener('resize', onResizeIndex);
-        window.dotNetHelperIndexPage = null;
+        dotNetHelperIndexPage = null;
     }
 
     let dotNetHelperSetupPage;
@@ -47,15 +55,13 @@
     }
 
     window.registerSetupViewportChangeCallback = (dotnetHelperObject) => {
-        window.addEventListener('load', onResizeSetup);
+        dotNetHelperSetupPage = dotnetHelperObject;
         window.addEventListener('resize', onResizeSetup);
-        window.dotNetHelperSetupPage = dotnetHelperObject;
     }
 
     window.unregisterSetupViewportChangeCallback = () => {
-        window.removeEventListener('load', onResizeSetup);
         window.removeEventListener('resize', onResizeSetup);
-        window.dotNetHelperSetupPage = null;
+        dotNetHelperSetupPage = null;
     }
 
     function ScrollToBottom(elementId) {

@@ -4,6 +4,9 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     Layout = "_Layout";
+    Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+    Response.Headers.Pragma = "no-cache";
+    Response.Headers.Expires = "0";
 }
 
 <component type="typeof(App)" render-mode="ServerPrerendered" />

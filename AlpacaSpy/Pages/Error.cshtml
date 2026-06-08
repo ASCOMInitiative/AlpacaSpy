@@ -1,0 +1,25 @@
+@page
+@namespace AlpacaSpy.Pages
+@{
+    Layout = null;
+    Response.StatusCode = 500;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ASCOM AlpacaSpy - Error</title>
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" asp-append-version="true" />
+    <link href="css/site.css" rel="stylesheet" asp-append-version="true" />
+</head>
+<body>
+    <main class="container" style="max-width: 900px; margin-top: 2rem;">
+        <div class="alert alert-danger" role="alert">
+            <h1 style="margin-top: 0;">ASCOM AlpacaSpy</h1>
+            <p style="margin-bottom: 0.5rem;"><strong>An unexpected error occurred while loading the application.</strong></p>
+            <p style="margin-bottom: 0;">Please refresh the browser. If the problem persists, restart AlpacaSpy and review the application log.</p>
+        </div>
+    </main>
+</body>
+</html>

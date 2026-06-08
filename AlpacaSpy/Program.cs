@@ -4,7 +4,7 @@ using ASCOM.Tools;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Radzen;
 using System.Diagnostics;
-using System.Net.NetworkInformation;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
@@ -31,25 +31,6 @@ namespace AlpacaSpy
             logger.LogMessage("Main", $"{ServerName} version {state.InformationalVersion}");
             logger.LogMessage("Main", $"Running on: {RuntimeInformation.OSDescription}.");
             logger.LogBlankLine();
-
-            try
-            {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    if (IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpConnections()
-                        .Any(con => con.LocalEndPoint.Port == settings.ServerPort &&
-                                    (con.State == TcpState.Listen || con.State == TcpState.Established)))
-                    {
-                        logger.LogMessage(string.Empty, "Detected port already in use, starting browser.");
-                        StartBrowser(settings.ServerPort);
-                        return;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError("Main", ex.Message);
-            }
 
             if (args?.Any(str => str.Contains("--reset")) ?? false)
             {
@@ -120,19 +101,14 @@ namespace AlpacaSpy
             app.MapControllers();
             app.MapFallbackToPage("/_Host");
 
-            try
-            {
-                if (settings.StartBrowserOnLaunch && !(args?.Any(str => str.Contains("--nobrowser")) ?? false))
-                    StartBrowser(settings.ServerPort);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning("Main", ex.Message);
-            }
-
             applicationLifetime = app.Lifetime;
             applicationLifetime.ApplicationStarted.Register(() =>
             {
+                if (settings.StartBrowserOnLaunch && !(args?.Any(str => str.Contains("--nobrowser")) ?? false))
+                {
+                    Task.Run(() => StartBrowserWhenReadyAsync(settings.ServerPort));
+                }
+
                 if (settings.AutoConnect && !state.Connected)
                     Task.Run(async () =>
                     {
@@ -282,6 +258,74 @@ namespace AlpacaSpy
                 FileName = $"http://localhost:{port}",
                 UseShellExecute = true
             });
+        }
+
+        private static async Task StartBrowserWhenReadyAsync(int port)
+        {
+            string[] startupPaths =
+            [
+                "/",
+                "/_framework/blazor.server.js",
+                "/css/site.css",
+                "/alpacaspy.styles.css",
+                "/_content/Radzen.Blazor/css/standard-base.css",
+                "/_content/Radzen.Blazor/Radzen.Blazor.js"
+            ];
+
+            try
+            {
+                using HttpClient httpClient = new()
+                {
+                    Timeout = TimeSpan.FromSeconds(2)
+                };
+
+                for (int attempt = 0; attempt < 20; attempt++)
+                {
+                    bool allReady = true;
+
+                    foreach (string startupPath in startupPaths)
+                    {
+                        try
+                        {
+                            Uri startupUri = new($"http://localhost:{port}{startupPath}");
+                            using HttpRequestMessage request = new(HttpMethod.Get, startupUri);
+                            using HttpResponseMessage response = await httpClient.SendAsync(request);
+
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                allReady = false;
+                                break;
+                            }
+                        }
+                        catch (HttpRequestException)
+                        {
+                            allReady = false;
+                            break;
+                        }
+                        catch (TaskCanceledException)
+                        {
+                            allReady = false;
+                            break;
+                        }
+                    }
+
+                    if (allReady)
+                    {
+                        await Task.Delay(500);
+                        StartBrowser(port);
+                        return;
+                    }
+
+                    await Task.Delay(250);
+                }
+
+                logger.LogWarning("Main", $"Timed out waiting for startup assets on http://localhost:{port} before opening the browser.");
+                StartBrowser(port);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning("Main", ex.Message);
+            }
         }
 
         private static LogLevel ToMicrosoftLogLevel(ASCOM.Common.Interfaces.LogLevel logLevel)
