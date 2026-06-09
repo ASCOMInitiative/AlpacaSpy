@@ -78,6 +78,7 @@
     <AssemblyConfiguration>$(Configuration)</AssemblyConfiguration>
     <AssemblyDescription>ASCOM AlpacaSpy</AssemblyDescription>
     <SignAssembly>false</SignAssembly>
+    <ApplicationIcon>ASCOM.ico</ApplicationIcon>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -88,6 +89,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DebugType>embedded</DebugType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="ASCOM.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ASCOM.Alpaca.Components" Version="4.0.0-rc.5" />
