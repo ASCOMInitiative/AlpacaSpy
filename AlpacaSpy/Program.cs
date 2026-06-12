@@ -14,6 +14,7 @@ namespace AlpacaSpy
     {
         internal const string DriverID = "ASCOMAlpacaSpy";
         internal const string Manufacturer = "Peter Simpson";
+        internal const string SingleInstanceMutexName = @"Global\ASCOMAlpacaSpy";
         internal static string ServerName = Globals.APPLICATION_NAME;
         internal static string ServerVersion = "Not set";
 
@@ -44,133 +45,179 @@ namespace AlpacaSpy
 
             logger.LogBlankLine();
 
-            WebApplicationBuilder builder = WebApplication.CreateBuilder(args ?? []);
+            Mutex? singleInstanceMutex = null;
+            bool ownsSingleInstanceMutex = false;
 
-            if (!(args?.Any(str => str.Contains("--urls")) ?? false))
+            try
             {
-                string host = settings.BindToAllNetworkAddresses ? "*" : "localhost";
-                builder.WebHost.UseUrls($"http://{host}:{settings.ServerPort}");
-            }
-
-            builder.Logging.ClearProviders();
-            builder.Logging.AddConsole();
-            builder.Logging.SetMinimumLevel(ToMicrosoftLogLevel(settings.LogLevel));
-
-            Logging.AttachLogger(logger);
-
-            DeviceManager.LoadConfiguration(new AlpacaConfiguration());
-            LoadProxyDevices(settings);
-
-            builder.Services.AddRazorPages();
-            builder.Services.AddServerSideBlazor(options =>
-            {
-                options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromSeconds(Globals.DISCONNECTED_CIRCUIT_RETENTION_PERIOD);
-            });
-            builder.Host.ConfigureHostOptions(options =>
-            {
-                options.ShutdownTimeout = TimeSpan.FromSeconds(Globals.APPLICATION_SHUTDOWN_TIMEOUT);
-            });
-
-            ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAlpacaAPIBehavoir(builder.Services);
-            ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAuthentication(builder.Services);
-            builder.Services.AddScoped<ASCOM.Alpaca.IUserService, Data.UserService>();
-            builder.Services.AddHttpClient("AlpacaProxy");
-
-            builder.Services.AddRadzenComponents();
-            builder.Services.AddScoped<PerBrowserState>();
-            builder.Services.AddSingleton<State>(_ => state);
-            builder.Services.AddSingleton<AlpacaSpyLogger>(_ => logger);
-            builder.Services.AddSingleton<Settings>(_ => settings);
-            builder.Services.AddSingleton<CircuitHandler, CircuitHandlerService>();
-
-            WebApplication app = builder.Build();
-
-            if (!app.Environment.IsDevelopment())
-                app.UseExceptionHandler("/Error");
-
-            ASCOM.Alpaca.Razor.StartupHelpers.ConfigureDiscovery(app);
-            ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAuthentication(app);
-
-            app.UseStaticFiles();
-            app.UseMiddleware<AlpacaProxyMiddleware>();
-            app.UseRouting();
-            app.MapBlazorHub(options =>
-            {
-                options.WebSockets.CloseTimeout = TimeSpan.FromSeconds(Globals.WEBSOCKET_CLOSE_TIMEOUT);
-            });
-            app.MapControllers();
-            app.MapFallbackToPage("/_Host");
-
-            applicationLifetime = app.Lifetime;
-            applicationLifetime.ApplicationStarted.Register(() =>
-            {
-                if (settings.StartBrowserOnLaunch && !(args?.Any(str => str.Contains("--nobrowser")) ?? false))
-                {
-                    Task.Run(() => StartBrowserWhenReadyAsync(settings.ServerPort));
-                }
-
-                if (settings.AutoConnect && !state.Connected)
-                    Task.Run(async () =>
-                    {
-                        lock (Globals.StateLock)
-                        {
-                            if (state.ConnectingToDevices) return;
-                            state.ConnectingToDevices = true;
-                        }
-                        try
-                        {
-                            state.OperationUnderway = true;
-                            await ConnectionManager.ConnectAsync(state, settings, logger);
-                        }
-                        finally
-                        {
-                            state.ConnectingToDevices = false;
-                            state.OperationUnderway = false;
-                        }
-                    });
-            });
-
-            applicationLifetime.ApplicationStopping.Register(() =>
-            {
-                logger.LogMessage(nameof(Main), "Application shutting down...");
-            });
-
-            applicationLifetime.ApplicationStopped.Register(() =>
-            {
-                logger.LogBlankLine();
-                logger.LogMessage(nameof(Main), "Application shutdown complete.");
-            });
-
-            app.Run();
-
-            // Clear the proxy devices to release any file locks before attempting restart
-            foreach (IDisposable device in state.ProxyDevices) try { device.Dispose(); } catch { }
-            state.ProxyDevices.Clear();
-
-            //Clear the device loggers to release file locks before attempting restart
-            foreach (TraceLogger deviceLogger in state.DeviceLoggers.Values) try { deviceLogger.Dispose(); } catch { }
-            state.DeviceLoggers.Clear();
-
-            // If a restart was requested, wait a moment for the current process to exit before starting a new instance
-            if (RestartRequested)
-            {
+                singleInstanceMutex = new Mutex(false, SingleInstanceMutexName, out _);
                 try
                 {
-                    string? processPath = Environment.ProcessPath;
-                    if (!string.IsNullOrWhiteSpace(processPath))
+                    ownsSingleInstanceMutex = singleInstanceMutex.WaitOne(0);
+                }
+                catch (AbandonedMutexException)
+                {
+                    ownsSingleInstanceMutex = true;
+                }
+
+                if (!ownsSingleInstanceMutex)
+                {
+                    logger.LogMessage(nameof(Main), "Another AlpacaSpy instance is already running. Opening the browser.");
+                    StartBrowser(settings.ServerPort);
+                    return;
+                }
+
+                WebApplicationBuilder builder = WebApplication.CreateBuilder(args ?? []);
+
+                if (!(args?.Any(str => str.Contains("--urls")) ?? false))
+                {
+                    string host = settings.BindToAllNetworkAddresses ? "*" : "localhost";
+                    builder.WebHost.UseUrls($"http://{host}:{settings.ServerPort}");
+                }
+
+                builder.Logging.ClearProviders();
+                builder.Logging.AddConsole();
+                builder.Logging.SetMinimumLevel(ToMicrosoftLogLevel(settings.LogLevel));
+
+                Logging.AttachLogger(logger);
+
+                DeviceManager.LoadConfiguration(new AlpacaConfiguration());
+                LoadProxyDevices(settings);
+
+                builder.Services.AddRazorPages();
+                builder.Services.AddServerSideBlazor(options =>
+                {
+                    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromSeconds(Globals.DISCONNECTED_CIRCUIT_RETENTION_PERIOD);
+                });
+                builder.Host.ConfigureHostOptions(options =>
+                {
+                    options.ShutdownTimeout = TimeSpan.FromSeconds(Globals.APPLICATION_SHUTDOWN_TIMEOUT);
+                });
+
+                ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAlpacaAPIBehavoir(builder.Services);
+                ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAuthentication(builder.Services);
+                builder.Services.AddScoped<ASCOM.Alpaca.IUserService, Data.UserService>();
+                builder.Services.AddHttpClient("AlpacaProxy");
+
+                builder.Services.AddRadzenComponents();
+                builder.Services.AddScoped<PerBrowserState>();
+                builder.Services.AddSingleton<State>(_ => state);
+                builder.Services.AddSingleton<AlpacaSpyLogger>(_ => logger);
+                builder.Services.AddSingleton<Settings>(_ => settings);
+                builder.Services.AddSingleton<CircuitHandler, CircuitHandlerService>();
+
+                WebApplication app = builder.Build();
+
+                if (!app.Environment.IsDevelopment())
+                    app.UseExceptionHandler("/Error");
+
+                ASCOM.Alpaca.Razor.StartupHelpers.ConfigureDiscovery(app);
+                ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAuthentication(app);
+
+                app.UseStaticFiles();
+                app.UseMiddleware<AlpacaProxyMiddleware>();
+                app.UseRouting();
+                app.MapBlazorHub(options =>
+                {
+                    options.WebSockets.CloseTimeout = TimeSpan.FromSeconds(Globals.WEBSOCKET_CLOSE_TIMEOUT);
+                });
+                app.MapControllers();
+                app.MapFallbackToPage("/_Host");
+
+                applicationLifetime = app.Lifetime;
+                applicationLifetime.ApplicationStarted.Register(() =>
+                {
+                    if (settings.StartBrowserOnLaunch && !(args?.Any(str => str.Contains("--nobrowser")) ?? false))
                     {
-                        Thread.Sleep(Globals.RESTART_DELAY * 1000);
-                        Process.Start(new ProcessStartInfo
+                        Task.Run(() => StartBrowserWhenReadyAsync(settings.ServerPort));
+                    }
+
+                    if (settings.AutoConnect && !state.Connected)
+                        Task.Run(async () =>
                         {
-                            FileName = processPath,
-                            Arguments = "--nobrowser",
-                            UseShellExecute = true
+                            lock (Globals.StateLock)
+                            {
+                                if (state.ConnectingToDevices) return;
+                                state.ConnectingToDevices = true;
+                            }
+
+                            try
+                            {
+                                state.OperationUnderway = true;
+                                await ConnectionManager.ConnectAsync(state, settings, logger);
+                            }
+                            finally
+                            {
+                                state.ConnectingToDevices = false;
+                                state.OperationUnderway = false;
+                            }
                         });
+                });
+
+                applicationLifetime.ApplicationStopping.Register(() =>
+                {
+                    logger.LogMessage(nameof(Main), "Application shutting down...");
+                });
+
+                applicationLifetime.ApplicationStopped.Register(() =>
+                {
+                    logger.LogBlankLine();
+                    logger.LogMessage(nameof(Main), "Application shutdown complete.");
+                });
+
+                app.Run();
+
+                // Clear the proxy devices to release any file locks before attempting restart
+                foreach (IDisposable device in state.ProxyDevices) try { device.Dispose(); } catch { }
+                state.ProxyDevices.Clear();
+
+                //Clear the device loggers to release file locks before attempting restart
+                foreach (TraceLogger deviceLogger in state.DeviceLoggers.Values) try { deviceLogger.Dispose(); } catch { }
+                state.DeviceLoggers.Clear();
+
+                // If a restart was requested, wait a moment for the current process to exit before starting a new instance
+                if (RestartRequested)
+                {
+                    try
+                    {
+                        if (ownsSingleInstanceMutex)
+                        {
+                            singleInstanceMutex.ReleaseMutex();
+                            ownsSingleInstanceMutex = false;
+                        }
+
+                        string? processPath = Environment.ProcessPath;
+                        if (!string.IsNullOrWhiteSpace(processPath))
+                        {
+                            Thread.Sleep(Globals.RESTART_DELAY * 1000);
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = processPath,
+                                Arguments = "--nobrowser",
+                                UseShellExecute = true
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(nameof(Main), $"Failed to restart: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
+            }
+            finally
+            {
+                if (singleInstanceMutex is not null)
                 {
-                    logger.LogError(nameof(Main), $"Failed to restart: {ex.Message}");
+                    if (ownsSingleInstanceMutex)
+                    {
+                        try
+                        {
+                            singleInstanceMutex.ReleaseMutex();
+                        }
+                        catch { }
+                    }
+
+                    singleInstanceMutex.Dispose();
                 }
             }
         }
@@ -255,7 +302,7 @@ namespace AlpacaSpy
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = $"http://localhost:{port}",
+                FileName = $"http://localhost:{port}/",
                 UseShellExecute = true
             });
         }
