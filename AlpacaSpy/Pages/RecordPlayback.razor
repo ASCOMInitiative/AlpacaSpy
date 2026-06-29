@@ -1,0 +1,152 @@
+﻿@page "/recordplayback"
+@inject State state
+@inject Settings settings
+@inject AlpacaSpyLogger logger
+@inject IJSRuntime JSRuntime
+@inject DialogService DialogService
+@using ASCOM.Alpaca.Discovery
+@using ASCOM.Common.Interfaces
+@using ASCOM.Common.Alpaca
+@using System.Text.Json
+
+@implements IAsyncDisposable
+
+<PageTitle>@Globals.APPLICATION_NAME - Record and Playback</PageTitle>
+
+<h3>Record and Playback</h3>
+
+<h4 style="margin-top:24px;">Settings</h4>
+<RadzenTabs>
+    <Tabs>
+        @foreach (ConfiguredDevice device in state.ConfiguredDevices)
+        {
+            // Get a list of all members
+            List<SelectiveLogMember> members = SelectiveLoggingMetadata.GetMembers(device.DeviceType).ToList();
+            
+            // Get the number of columns required for this device type,
+            int numberOfColumns = Globals.DevicetypeDisplayColumns.TryGetValue(device.DeviceType, out int cols) ? cols : 1;
+
+            // Calculate the number of items per column, rounding up to ensure all items are included
+            int splitIndex = (members.Count + numberOfColumns - 1) / numberOfColumns;
+
+            // Create a dictionary to hold the members for each column
+            Dictionary<int, List<SelectiveLogMember>> columns = new();
+            for (int i = 0; i < numberOfColumns; i++)
+            {
+                columns[i] = members.Skip(i * splitIndex).Take(splitIndex).ToList();
+            }
+
+            string styleText = $"border:1px solid #ccc;padding:12px;border-radius:4px;max-width:{(numberOfColumns == 1 ? 700 : 60 + 270 * numberOfColumns)}px;";
+
+            <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId" Style="--rz-tabs-tab-display: inline-flex; --rz-tabs-tab-align-items: center;">
+                <div style=@styleText>
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                        <span style="font-size:20px;font-weight:bold;">@device.Name</span>
+                        <span style="color:gray;font-size:15px;">(@device.DeviceType) @device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber</span>
+                    </div>
+                    <strong style="margin-right:auto;">Header and parameter logging</strong>
+                    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                        <span style="min-width:205px;">
+                            <RadzenCheckBox Value="device.LogClientHeaders"
+                                            ValueChanged="@((bool v) => { device.LogClientHeaders = v; settings.Save(); })"
+                                            Name="@($"lch_{device.UniqueId}")" />
+                            <label>Headers to device</label>
+                        </span>
+                        <span style="min-width:205px;">
+                            <RadzenCheckBox Value="device.LogClientParams"
+                                            ValueChanged="@((bool v) => { device.LogClientParams = v; settings.Save(); })"
+                                            Name="@($"lcq_{device.UniqueId}")" />
+                            <label>Parameters to device</label>
+                        </span>
+                        <span style="min-width:205px;">
+                            <RadzenCheckBox Value="device.LogDeviceHeaders"
+                                            ValueChanged="@((bool v) => { device.LogDeviceHeaders = v; settings.Save(); })"
+                                            Name="@($"ldh_{device.UniqueId}")" />
+                            <label>Headers from device</label>
+                        </span>
+                        <span style="min-width:205px;">
+                            <RadzenCheckBox Value="device.LogJsonParameters"
+                                            ValueChanged="@((bool v) => { device.LogJsonParameters = v; settings.Save(); })"
+                                            Name="@($"ljp_{device.UniqueId}")" />
+                            <label>JSON from device</label>
+                        </span>
+                    </div>
+                </div>
+            </RadzenTabsItem>
+        }
+    </Tabs>
+</RadzenTabs>
+
+
+
+
+@code {
+
+    public class FixedSizeConcurrentQueue<T>
+    {
+        private readonly System.Collections.Concurrent.ConcurrentQueue<T> _queue = new();
+        private readonly int _maxSize;
+
+        public FixedSizeConcurrentQueue(int maxSize)
+        {
+            if (maxSize <= 0)
+                throw new ArgumentOutOfRangeException(nameof(maxSize));
+
+            _maxSize = maxSize;
+        }
+
+        public void Add(T item)
+        {
+            _queue.Enqueue(item);
+
+            // Trim old items if we exceed the limit
+            while (_queue.Count > _maxSize)
+                _queue.TryDequeue(out _);
+        }
+
+        public int Count => _queue.Count;
+
+        public T[] ToArray() => _queue.ToArray();
+    }
+
+
+    public async Task SerializeWithProgressAsync(Stream output, IReadOnlyList<bool> transactions, IProgress<double> progress)
+    {
+        var options = new JsonWriterOptions
+        {
+            Indented = false,
+            SkipValidation = false
+        };
+
+        using var writer = new Utf8JsonWriter(output, options);
+
+        writer.WriteStartArray();
+
+        int total = transactions.Count;
+        for (int i = 0; i < total; i++)
+        {
+            JsonSerializer.Serialize(writer, transactions[i]);
+
+            // Flush occasionally so the file grows continuously
+            if (i % 100 == 0)
+                await writer.FlushAsync();
+
+            // Report progress
+            progress?.Report((double)(i + 1) / total);
+        }
+
+        writer.WriteEndArray();
+        await writer.FlushAsync();
+    }
+
+
+
+
+
+    public ValueTask DisposeAsync()
+    {
+        // Add any cleanup code here if needed
+
+        return ValueTask.CompletedTask;
+    }
+}

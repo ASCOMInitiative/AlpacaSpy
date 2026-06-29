@@ -1,0 +1,24 @@
+﻿@page "/help"
+@inject State state
+@inject Settings settings
+@inject AlpacaSpyLogger logger
+@inject IJSRuntime JSRuntime
+@inject DialogService DialogService
+@using ASCOM.Alpaca.Discovery
+@using ASCOM.Common.Interfaces
+@using ASCOM.Common.Alpaca
+
+@implements IAsyncDisposable
+
+<PageTitle>@Globals.APPLICATION_NAME - Help</PageTitle>
+
+<h3>Help</h3>
+
+@code {
+    public ValueTask DisposeAsync()
+    {
+        // Add any cleanup code here if needed
+
+        return ValueTask.CompletedTask;
+    }
+}
