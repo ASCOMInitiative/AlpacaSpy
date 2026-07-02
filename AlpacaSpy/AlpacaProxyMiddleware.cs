@@ -1,5 +1,8 @@
 using AlpacaSpy.Models;
 using ASCOM.Tools;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Radzen.Documents.Markdown;
+using System.Net.Http.Headers;
 using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
@@ -108,13 +111,71 @@ namespace AlpacaSpy
             byte[] responseBytes;
             try
             {
+                DateTime requestSentToDevice = DateTime.Now;
                 responseMessage = await client.SendAsync(forwardRequest, HttpCompletionOption.ResponseContentRead);
                 responseBytes = await responseMessage.Content.ReadAsByteArrayAsync();
+                DateTime responseFromDevice = DateTime.Now;
+                if (device.Recording)
+                {
+                    AlpacaTransaction transaction = new AlpacaTransaction()
+                    {
+                        RequestMethod = context.Request.Method,
+                        RequestUri = context.Request.Path + context.Request.QueryString,
+                        RequestHeaders = context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()),
+                        RequestHttpVersion = context.Request.Protocol switch
+                        {
+                            "HTTP/1.0" => new Version(1, 0),
+                            "HTTP/1.1" => new Version(1, 1),
+                            "HTTP/2" => new Version(2, 0),
+                            _ => new Version(1, 1)
+                        },
+                        RequestBody = requestBodyBytes.Length > 0 ? Encoding.UTF8.GetString(requestBodyBytes) : "",
+                        RequestTimeSent = requestSentToDevice,
+                        ResponseStatusCode = responseMessage.StatusCode,
+                        ResponseHttpVersion = responseMessage.Version,
+                        ResponseHeaders = responseMessage.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()),
+                        ResponseTime = responseFromDevice - requestSentToDevice,
+                    };
+
+                    string responseString = responseBytes.Length > 0 ? Encoding.UTF8.GetString(responseBytes) : "";
+                    try
+                    {
+                        JsonDocument document = JsonDocument.Parse(responseString);
+                        transaction.Response = document;
+                    }
+                    catch // The supplied string was not parseable into a JSON string so create a valid JSON document that contains the response string as a plain string value
+                    {
+                        // Ensure that this reporting mechanic does not interrupt recording if it fails.
+                        try
+                        {
+                            // Create a JSON string containing the response string as a property value. 
+                            // NOTE: This tricky piece of code works by creating a temporary anonymous object, assigning responseString's value to its property "UnparsableResponse" and then serializing that object into a JSON string.
+                            string json = JsonSerializer.Serialize(new
+                            {
+                                UnparsableResponse = responseString
+                            });
+
+                            // Parse the JSON string into a JSON document and save it
+                            JsonDocument document = JsonDocument.Parse(json);
+                            transaction.Response = document;
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError("AlpacaProxyMiddleware", $"Error parsing response: {responseString}\r\n{ex}");
+                        }
+                    }
+
+                    // Save the transaction for later replaying
+                    state.Transactions[device].Add(transaction);
+                }
             }
             catch (Exception ex)
             {
                 if (logThisCall)
+                {
                     logger.LogError("Proxy", $"Forward error → {device.Name} ({targetUrl}): {ex.Message}");
+                    logger.LogDebug("Proxy", ex.ToString());
+                }
                 await ReturnAlpacaErrorAsync(context, 1024, $"AlpacaSpy proxy error: {ex.Message}");
                 return;
             }

@@ -4,9 +4,6 @@
 @inject AlpacaSpyLogger logger
 @inject IJSRuntime JSRuntime
 @inject DialogService DialogService
-@using ASCOM.Alpaca.Discovery
-@using ASCOM.Common.Interfaces
-@using ASCOM.Common.Alpaca
 @using System.Text.Json
 
 @implements IAsyncDisposable
@@ -22,7 +19,7 @@
         {
             // Get a list of all members
             List<SelectiveLogMember> members = SelectiveLoggingMetadata.GetMembers(device.DeviceType).ToList();
-            
+
             // Get the number of columns required for this device type,
             int numberOfColumns = Globals.DevicetypeDisplayColumns.TryGetValue(device.DeviceType, out int cols) ? cols : 1;
 
@@ -72,6 +69,19 @@
                         </span>
                     </div>
                 </div>
+
+                <div>
+                    <RadzenButton Click="() => ExportEntries(device)"
+                                  Text="Export entries"
+                                  ButtonStyle="ButtonStyle.Primary"
+                                  Style="margin-top:24px;border-radius:20px; text-transform:none;" />
+                </div>
+                <div>
+                    <RadzenButton Click="() => ClearEntries(device)"
+                                  Text="Clear entries"
+                                  ButtonStyle="ButtonStyle.Danger"
+                                  Style="top:24px;border-radius:20px; text-transform:none;" />
+                </div>
             </RadzenTabsItem>
         }
     </Tabs>
@@ -81,6 +91,46 @@
 
 
 @code {
+
+    public async Task ClearEntries(ConfiguredDevice device)
+    {
+        state.Transactions[device].Clear();
+    }
+
+    public async Task ExportEntries(ConfiguredDevice device)
+    {
+
+        
+        using (Stream output = new FileStream(Path.Combine(ASCOM.Tools.TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}.json"), FileMode.Create))
+        {
+            var options = new JsonWriterOptions
+            {
+                Indented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                SkipValidation = false
+            };
+
+            using var writer = new Utf8JsonWriter(output, options);
+
+            writer.WriteStartArray();
+
+            int total = state.Transactions[device].Count;
+            for (int i = 0; i < total; i++)
+            {
+                JsonSerializer.Serialize(writer, state.Transactions[device][i]);
+
+                // Flush occasionally so the file grows continuously
+                if (i % 100 == 0)
+                    await writer.FlushAsync();
+
+                // Report progress
+                //progress?.Report((double)(i + 1) / total);
+            }
+
+            writer.WriteEndArray();
+            await writer.FlushAsync();
+        }
+    }
 
     public class FixedSizeConcurrentQueue<T>
     {

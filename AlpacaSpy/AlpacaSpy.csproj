@@ -95,10 +95,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ASCOM.Alpaca.Components" Version="4.0.0-rc.5" />
+    <PackageReference Include="ASCOM.Alpaca.Components" Version="4.0.0-rc.6" />
     <PackageReference Include="ASCOM.Alpaca.Razor" Version="0.6.0-alpha02" />
-    <PackageReference Include="ASCOM.Tools" Version="4.0.0-rc.5" />
-    <PackageReference Include="Radzen.Blazor" Version="10.4.7" />
+    <PackageReference Include="ASCOM.Tools" Version="4.0.0-rc.6" />
+    <PackageReference Include="Radzen.Blazor" Version="11.0.5" />
   </ItemGroup>
 
 </Project>

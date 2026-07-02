@@ -224,6 +224,7 @@ namespace AlpacaSpy
 
         private static void LoadProxyDevices(Settings settings)
         {
+            // Initialise configured devices in the state object
             state.ConfiguredDevices = settings.ConfiguredDevices?.ToList() ?? new List<Models.ConfiguredDevice>();
             settings.ConfiguredDevices ??= new List<Models.ConfiguredDevice>();
 
@@ -290,6 +291,9 @@ namespace AlpacaSpy
                     string safeName = Regex.Replace(config.Name, @"[^\w]", "_");
                     TraceLogger deviceLogger = new($"AlpacaSpy.{safeName}", true);
                     state.DeviceLoggers[config.UniqueId] = deviceLogger;
+
+                    // Initialise the recording memory object for this device
+                    state.Transactions[config] = new();
                 }
                 catch (Exception ex)
                 {

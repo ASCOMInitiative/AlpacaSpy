@@ -17,6 +17,6 @@ namespace AlpacaSpy.Models
         public List<string>? EnabledLogMembers { get; set; }
 
         // Internal values that are not persisted
-        internal bool Recording { get; set; } = false;
+        internal bool Recording { get; set; } = true;
     }
 }
