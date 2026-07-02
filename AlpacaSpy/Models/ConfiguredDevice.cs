@@ -15,8 +15,12 @@ namespace AlpacaSpy.Models
         public bool LogDeviceHeaders { get; set; } = false;
         public bool LogJsonParameters { get; set; } = false;
         public List<string>? EnabledLogMembers { get; set; }
+        public bool RecordClientHeaders { get; set; } = true; // Record headers from the client
+        public bool RecordDeviceHeaders { get; set; } = true; // Record headers from the device
+        public bool RecordFileUniqueIds { get; set; } = true; // False = always use the same export filename, true = unique file name on each export
 
         // Internal values that are not persisted
-        internal bool Recording { get; set; } = true;
+        internal bool Recording { get; set; } = false; // Recording enabled / disabled
+
     }
 }

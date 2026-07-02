@@ -50,7 +50,7 @@
                                           Style="border-radius:20px; text-transform:none;" />
                         </span>
                     </div>
-                    <strong style="margin-right:auto;">Recording State</strong>
+                    <strong style="margin-right:auto;">Recording State</strong> <span>(Not persisted)</span>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
                         <span style="margin-bottom:24px;min-width:205px;">
                             <RadzenCheckBox Value="device.Recording"
@@ -59,21 +59,27 @@
                             <label>Recording enabled</label>
                         </span>
                     </div>
-                    <strong style="margin-top:24px;margin-right:auto;">Header Recording</strong>
+                    <strong style="margin-top:24px;margin-right:auto;">Configuration</strong>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                        <span style="min-width:205px;">
+                        <span style="min-width:260px;">
                             <RadzenCheckBox Value="device.RecordClientHeaders"
                                             ValueChanged="@((bool v) => { device.RecordClientHeaders = v;settings.Save();})"
                                             Disabled=@(device.DeviceType == AlpacaDeviceType.Camera)
                                             Name="@($"lch_{device.UniqueId}")" />
-                            <label>Headers to device</label>
+                            <label>Record headers from client</label>
                         </span>
-                        <span style="min-width:205px;">
+                        <span style="min-width:260px;">
                             <RadzenCheckBox Value="device.RecordDeviceHeaders"
                                             ValueChanged="@((bool v) => { device.RecordDeviceHeaders = v; settings.Save();})"
                                             Disabled=@(device.DeviceType == AlpacaDeviceType.Camera)
                                             Name="@($"ldh_{device.UniqueId}")" />
-                            <label>Headers from device</label>
+                            <label>Record headers from device</label>
+                        </span>
+                        <span style="min-width:260px;">
+                            <RadzenCheckBox Value="device.RecordFileUniqueIds"
+                                            ValueChanged="@((bool v) => { device.RecordFileUniqueIds = v; settings.Save();})"
+                                            Name="@($"fil_{device.UniqueId}")" />
+                            <label>Create unique export filenames</label>
                         </span>
                     </div>
                 </div>
@@ -84,8 +90,11 @@
                                       Text="Export entries"
                                       ButtonStyle="ButtonStyle.Primary"
                                       Style="border-radius:20px; text-transform:none;" />
-                        <span style="margin-left:24px;">Export file: @((Path.Combine(TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}.json")))</span>
+                        <span style="margin-left:24px;">Export file: @(defaultExportPath)</span>
                     </div>
+                </div>
+                <div>
+                    <RadzenProgressBar @bind-Value="@exportProgress" AriaLabel="Progress" Style="margin-top:24px;"/>
                 </div>
             </RadzenTabsItem>
         }
@@ -93,6 +102,8 @@
 </RadzenTabs>
 
 @code {
+    public string defaultExportPath = "";
+    public double exportProgress = 0.0;
 
     public async Task ClearEntries(ConfiguredDevice device)
     {
@@ -108,7 +119,11 @@
         }
         try
         {
-            using (Stream output = new FileStream(Path.Combine(TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}.{Convert.ToInt32(DateTime.Now.TimeOfDay.TotalSeconds)}.json"), FileMode.Create))
+            defaultExportPath = Path.Combine(TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}{(device.RecordFileUniqueIds ? "." + Convert.ToInt32(DateTime.Now.TimeOfDay.TotalSeconds) : "")}.json");
+
+            await InvokeAsync(StateHasChanged);
+
+            using (Stream output = new FileStream(defaultExportPath, FileMode.Create))
             {
                 var options = new JsonWriterOptions
                 {
@@ -131,11 +146,14 @@
                         await writer.FlushAsync();
 
                     // Report progress
-                    //progress?.Report((double)(i + 1) / total);
+                    exportProgress = i * 100 / total;
+                    await InvokeAsync(StateHasChanged);
                 }
 
                 writer.WriteEndArray();
                 await writer.FlushAsync();
+                exportProgress =100.0;
+                await InvokeAsync(StateHasChanged);
             }
         }
         catch (Exception ex)
@@ -143,6 +161,8 @@
             logger.LogError("ExportEntries", $"Exception: {ex.Message}\r\n{ex}");
             await DialogService.Alert($"An error occurred while exporting, see Home page for details: {ex.Message}", "Unable to Export", null);
         }
+
+        await DialogService.Alert("Export completed successfully", "Export Outcome", null);
     }
 
     public class FixedSizeConcurrentQueue<T>
@@ -171,40 +191,6 @@
 
         public T[] ToArray() => _queue.ToArray();
     }
-
-
-    public async Task SerializeWithProgressAsync(Stream output, IReadOnlyList<bool> transactions, IProgress<double> progress)
-    {
-        var options = new JsonWriterOptions
-        {
-            Indented = false,
-            SkipValidation = false
-        };
-
-        using var writer = new Utf8JsonWriter(output, options);
-
-        writer.WriteStartArray();
-
-        int total = transactions.Count;
-        for (int i = 0; i < total; i++)
-        {
-            JsonSerializer.Serialize(writer, transactions[i]);
-
-            // Flush occasionally so the file grows continuously
-            if (i % 100 == 0)
-                await writer.FlushAsync();
-
-            // Report progress
-            progress?.Report((double)(i + 1) / total);
-        }
-
-        writer.WriteEndArray();
-        await writer.FlushAsync();
-    }
-
-
-
-
 
     public ValueTask DisposeAsync()
     {

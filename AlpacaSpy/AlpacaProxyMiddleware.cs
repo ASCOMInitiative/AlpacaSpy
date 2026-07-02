@@ -121,7 +121,7 @@ namespace AlpacaSpy
                     {
                         RequestMethod = context.Request.Method,
                         RequestUri = context.Request.Path + context.Request.QueryString,
-                        RequestHeaders = context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()),
+                        RequestHeaders = device.RecordClientHeaders ? context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()) : new(),
                         RequestHttpVersion = context.Request.Protocol switch
                         {
                             "HTTP/1.0" => new Version(1, 0),
@@ -133,7 +133,7 @@ namespace AlpacaSpy
                         RequestTimeSent = requestSentToDevice,
                         ResponseStatusCode = responseMessage.StatusCode,
                         ResponseHttpVersion = responseMessage.Version,
-                        ResponseHeaders = responseMessage.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()),
+                        ResponseHeaders = device.RecordDeviceHeaders ? responseMessage.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()) : new(),
                         ResponseTime = responseFromDevice - requestSentToDevice,
                     };
 
