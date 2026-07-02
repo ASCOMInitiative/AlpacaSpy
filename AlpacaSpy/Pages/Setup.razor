@@ -81,7 +81,7 @@
 <RadzenTabs>
     <Tabs>
         <RadzenTabsItem Text="Settings">
-            <div style="display:flex;flex-direction:column;gap:8px;max-width:400px;">
+            <div style="display:flex;flex-direction:column;gap:8px;max-width:800px;">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
                                     Value="settings.AutoConnect"
@@ -200,6 +200,18 @@
                                     Name="runInStrictAlpacaMode" />
                     <label style="min-width:750px;">Run in Alpaca strict casing mode. (Devices that fail when this is checked are not Alpaca compliant.)</label>
                 </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:160px;">Transaction records:</label>
+                    <RadzenNumeric TValue="int"
+                                   Value="@settings.MaximumRecordingFileEntries"
+                                   ValueChanged="@(async (int v) => { settings.MaximumRecordingFileEntries = v; await SaveSettings(); })"
+                                   Min="10"
+                                   Disabled="@state.Connected"
+                                   Format="N0"
+                                   Style="width:100px;" />
+                                   <span>Maximum number of recorded transactions (per device).</span>
+                </div>
+
             </div>
         </RadzenTabsItem>
 

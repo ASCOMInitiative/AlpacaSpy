@@ -14,6 +14,8 @@ namespace AlpacaSpy
         private readonly int settingsFileVersion;
         private static readonly JsonSerializerOptions jsonSerialisationOptions;
 
+        #region Initiators
+
         static Settings()
         {
             jsonSerialisationOptions = new()
@@ -148,6 +150,8 @@ namespace AlpacaSpy
             }
         }
 
+        #endregion
+
         public List<ConfiguredDevice> ConfiguredDevices { get; set; } = new();
         public bool LogDiscoveryMessages { get; set; } = false;
         public bool StartBrowserOnLaunch { get; set; } = true;
@@ -164,6 +168,8 @@ namespace AlpacaSpy
         public bool AllowDiscovery { get; set; } = true;
         public bool SendDiscoveryResponsesOnAllNetworks { get; set; } = true;
         public bool RunInStrictAlpacaMode { get; set; } = true;
+
+        public int MaximumRecordingFileEntries { get; set; } = Globals.MAXIMUM_RECORDING_FILE_ENTRIES;
 
         public void ResetToDefaults()
         {

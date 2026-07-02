@@ -1,5 +1,6 @@
 using AlpacaSpy.Models;
 using ASCOM.Common;
+using System.Numerics;
 
 namespace AlpacaSpy
 {
@@ -24,6 +25,8 @@ namespace AlpacaSpy
         internal const int LOG_REFRESH_INTERVAL = 250;
         internal const int MAX_CONFIGURED_DEVICES = 10;
         internal const double ALPACA_DISCOVERY_DURATION_SECONDS = 1.0;
+
+        internal const int MAXIMUM_RECORDING_FILE_ENTRIES = 100000;
 
         // The number of columns to display for each device type in the setup window's property list.
         internal static readonly Dictionary<AlpacaDeviceType, int> DevicetypeDisplayColumns = new()

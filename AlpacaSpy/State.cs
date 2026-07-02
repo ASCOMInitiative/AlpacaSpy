@@ -42,7 +42,7 @@ namespace AlpacaSpy
 
         public List<ConfiguredDevice> ConfiguredDevices { get; set; } = new();
 
-        public Dictionary<ConfiguredDevice, List<AlpacaTransaction>> Transactions { get; set; } = new();
+        public Dictionary<ConfiguredDevice, FixedCapacityList<AlpacaTransaction>> Transactions { get; set; } = new(Globals.MAXIMUM_RECORDING_FILE_ENTRIES);
 
         public List<object> ProxyDevices { get; set; } = new();
 

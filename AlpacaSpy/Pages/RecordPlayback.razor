@@ -139,7 +139,7 @@
                 int total = state.Transactions[device].Count;
                 for (int i = 0; i < total; i++)
                 {
-                    JsonSerializer.Serialize(writer, state.Transactions[device][i]);
+                    JsonSerializer.Serialize(writer, state.Transactions[device].ToArray()[i]);
 
                     // Flush occasionally so the file grows continuously
                     if (i % 100 == 0)

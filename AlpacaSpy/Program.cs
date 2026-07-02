@@ -293,7 +293,7 @@ namespace AlpacaSpy
                     state.DeviceLoggers[config.UniqueId] = deviceLogger;
 
                     // Initialise the recording memory object for this device
-                    state.Transactions[config] = new();
+                    state.Transactions[config] = new(settings.MaximumRecordingFileEntries);
                 }
                 catch (Exception ex)
                 {
