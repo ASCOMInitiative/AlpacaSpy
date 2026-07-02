@@ -38,9 +38,17 @@
 
             <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId" Style="--rz-tabs-tab-display: inline-flex; --rz-tabs-tab-align-items: center;">
                 <div style=@styleText>
-                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-                        <span style="font-size:20px;font-weight:bold;">@device.Name</span>
-                        <span style="color:gray;font-size:15px;">(@device.DeviceType) @device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber</span>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <span style="font-size:20px;font-weight:bold;">@device.Name</span>
+                            <span style="color:gray;font-size:15px;">(@device.DeviceType) @device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber</span>
+                        </div>
+                        <span>
+                            <RadzenButton Click="() => ClearEntries(device)"
+                                          Text="Clear entries"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Style="border-radius:20px; text-transform:none;" />
+                        </span>
                     </div>
                     <strong style="margin-right:auto;">Recording State</strong>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
@@ -77,12 +85,6 @@
                                       ButtonStyle="ButtonStyle.Primary"
                                       Style="border-radius:20px; text-transform:none;" />
                         <span style="margin-left:24px;">Export file: @((Path.Combine(TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}.json")))</span>
-                    </div>
-                    <div>
-                        <RadzenButton Click="() => ClearEntries(device)"
-                                      Text="Clear entries"
-                                      ButtonStyle="ButtonStyle.Danger"
-                                      Style="border-radius:20px; text-transform:none;" />
                     </div>
                 </div>
             </RadzenTabsItem>
