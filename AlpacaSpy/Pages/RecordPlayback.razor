@@ -5,6 +5,7 @@
 @inject IJSRuntime JSRuntime
 @inject DialogService DialogService
 @using System.Text.Json
+@using ASCOM.Tools
 
 @implements IAsyncDisposable
 
@@ -41,54 +42,53 @@
                         <span style="font-size:20px;font-weight:bold;">@device.Name</span>
                         <span style="color:gray;font-size:15px;">(@device.DeviceType) @device.IpAddress:@device.PortNumber / Device @device.RemoteDeviceNumber</span>
                     </div>
-                    <strong style="margin-right:auto;">Header and parameter logging</strong>
+                    <strong style="margin-right:auto;">Recording State</strong>
+                    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                        <span style="margin-bottom:24px;min-width:205px;">
+                            <RadzenCheckBox Value="device.Recording"
+                                            ValueChanged="@((bool v) => { device.Recording = v;})"
+                                            Name="@($"rec_{device.UniqueId}")" />
+                            <label>Recording enabled</label>
+                        </span>
+                    </div>
+                    <strong style="margin-top:24px;margin-right:auto;">Header Recording</strong>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
                         <span style="min-width:205px;">
-                            <RadzenCheckBox Value="device.LogClientHeaders"
-                                            ValueChanged="@((bool v) => { device.LogClientHeaders = v; settings.Save(); })"
+                            <RadzenCheckBox Value="device.RecordClientHeaders"
+                                            ValueChanged="@((bool v) => { device.RecordClientHeaders = v;settings.Save();})"
+                                            Disabled=@(device.DeviceType == AlpacaDeviceType.Camera)
                                             Name="@($"lch_{device.UniqueId}")" />
                             <label>Headers to device</label>
                         </span>
                         <span style="min-width:205px;">
-                            <RadzenCheckBox Value="device.LogClientParams"
-                                            ValueChanged="@((bool v) => { device.LogClientParams = v; settings.Save(); })"
-                                            Name="@($"lcq_{device.UniqueId}")" />
-                            <label>Parameters to device</label>
-                        </span>
-                        <span style="min-width:205px;">
-                            <RadzenCheckBox Value="device.LogDeviceHeaders"
-                                            ValueChanged="@((bool v) => { device.LogDeviceHeaders = v; settings.Save(); })"
+                            <RadzenCheckBox Value="device.RecordDeviceHeaders"
+                                            ValueChanged="@((bool v) => { device.RecordDeviceHeaders = v; settings.Save();})"
+                                            Disabled=@(device.DeviceType == AlpacaDeviceType.Camera)
                                             Name="@($"ldh_{device.UniqueId}")" />
                             <label>Headers from device</label>
-                        </span>
-                        <span style="min-width:205px;">
-                            <RadzenCheckBox Value="device.LogJsonParameters"
-                                            ValueChanged="@((bool v) => { device.LogJsonParameters = v; settings.Save(); })"
-                                            Name="@($"ljp_{device.UniqueId}")" />
-                            <label>JSON from device</label>
                         </span>
                     </div>
                 </div>
 
-                <div>
-                    <RadzenButton Click="() => ExportEntries(device)"
-                                  Text="Export entries"
-                                  ButtonStyle="ButtonStyle.Primary"
-                                  Style="margin-top:24px;border-radius:20px; text-transform:none;" />
-                </div>
-                <div>
-                    <RadzenButton Click="() => ClearEntries(device)"
-                                  Text="Clear entries"
-                                  ButtonStyle="ButtonStyle.Danger"
-                                  Style="top:24px;border-radius:20px; text-transform:none;" />
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:24px;">
+                    <div style="display:flex;align-items:center;">
+                        <RadzenButton Click="() => ExportEntries(device)"
+                                      Text="Export entries"
+                                      ButtonStyle="ButtonStyle.Primary"
+                                      Style="border-radius:20px; text-transform:none;" />
+                        <span style="margin-left:24px;">Export file: @((Path.Combine(TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}.json")))</span>
+                    </div>
+                    <div>
+                        <RadzenButton Click="() => ClearEntries(device)"
+                                      Text="Clear entries"
+                                      ButtonStyle="ButtonStyle.Danger"
+                                      Style="border-radius:20px; text-transform:none;" />
+                    </div>
                 </div>
             </RadzenTabsItem>
         }
     </Tabs>
 </RadzenTabs>
-
-
-
 
 @code {
 
@@ -99,36 +99,47 @@
 
     public async Task ExportEntries(ConfiguredDevice device)
     {
-
-        
-        using (Stream output = new FileStream(Path.Combine(ASCOM.Tools.TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}.json"), FileMode.Create))
+        if (state.Transactions[device].Count == 0)
         {
-            var options = new JsonWriterOptions
+            await DialogService.Alert("No transactions have been recorded", "Unable to Export", null);
+            return;
+        }
+        try
+        {
+            using (Stream output = new FileStream(Path.Combine(TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}.{Convert.ToInt32(DateTime.Now.TimeOfDay.TotalSeconds)}.json"), FileMode.Create))
             {
-                Indented = true,
-                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                SkipValidation = false
-            };
+                var options = new JsonWriterOptions
+                {
+                    Indented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                    SkipValidation = false
+                };
 
-            using var writer = new Utf8JsonWriter(output, options);
+                using var writer = new Utf8JsonWriter(output, options);
 
-            writer.WriteStartArray();
+                writer.WriteStartArray();
 
-            int total = state.Transactions[device].Count;
-            for (int i = 0; i < total; i++)
-            {
-                JsonSerializer.Serialize(writer, state.Transactions[device][i]);
+                int total = state.Transactions[device].Count;
+                for (int i = 0; i < total; i++)
+                {
+                    JsonSerializer.Serialize(writer, state.Transactions[device][i]);
 
-                // Flush occasionally so the file grows continuously
-                if (i % 100 == 0)
-                    await writer.FlushAsync();
+                    // Flush occasionally so the file grows continuously
+                    if (i % 100 == 0)
+                        await writer.FlushAsync();
 
-                // Report progress
-                //progress?.Report((double)(i + 1) / total);
+                    // Report progress
+                    //progress?.Report((double)(i + 1) / total);
+                }
+
+                writer.WriteEndArray();
+                await writer.FlushAsync();
             }
-
-            writer.WriteEndArray();
-            await writer.FlushAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("ExportEntries", $"Exception: {ex.Message}\r\n{ex}");
+            await DialogService.Alert($"An error occurred while exporting, see Home page for details: {ex.Message}", "Unable to Export", null);
         }
     }
 
