@@ -5,7 +5,7 @@ using ASCOM.Common.DeviceInterfaces;
 
 namespace AlpacaSpy.ProxyDevices
 {
-    public class ProxySwitch : ISwitchV3
+    public class ProxySwitch : ISwitchV3, IDisposable
     {
         private readonly ConfiguredDevice _config;
         private readonly State _state;

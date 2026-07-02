@@ -6,7 +6,7 @@ using ASCOM.Common.DeviceInterfaces;
 
 namespace AlpacaSpy.ProxyDevices
 {
-    public class ProxyCamera : ICameraV4
+    public class ProxyCamera : ICameraV4, IDisposable
     {
         private readonly ConfiguredDevice _config;
         private readonly State _state;

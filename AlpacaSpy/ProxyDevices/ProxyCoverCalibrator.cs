@@ -5,7 +5,7 @@ using ASCOM.Common.DeviceInterfaces;
 
 namespace AlpacaSpy.ProxyDevices
 {
-    public class ProxyCoverCalibrator : ICoverCalibratorV2
+    public class ProxyCoverCalibrator : ICoverCalibratorV2, IDisposable
     {
         private readonly ConfiguredDevice _config;
         private readonly State _state;

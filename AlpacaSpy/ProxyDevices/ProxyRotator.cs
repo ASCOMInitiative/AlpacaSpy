@@ -5,7 +5,7 @@ using ASCOM.Common.DeviceInterfaces;
 
 namespace AlpacaSpy.ProxyDevices
 {
-    public class ProxyRotator : IRotatorV4
+    public class ProxyRotator : IRotatorV4, IDisposable
     {
         private readonly ConfiguredDevice _config;
         private readonly State _state;

@@ -5,7 +5,7 @@ using ASCOM.Common.DeviceInterfaces;
 
 namespace AlpacaSpy.ProxyDevices
 {
-    public class ProxyFocuser : IFocuserV4
+    public class ProxyFocuser : IFocuserV4, IDisposable
     {
         private readonly ConfiguredDevice _config;
         private readonly State _state;
