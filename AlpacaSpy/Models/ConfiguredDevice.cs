@@ -18,9 +18,9 @@ namespace AlpacaSpy.Models
         public bool RecordClientHeaders { get; set; } = true; // Record headers from the client
         public bool RecordDeviceHeaders { get; set; } = true; // Record headers from the device
         public bool RecordFileUniqueIds { get; set; } = true; // False = always use the same export filename, true = unique file name on each export
+        public bool RecordTransactions { get; set; } = false; // Recording enabled / disabled
 
         // Internal values that are not persisted
-        internal bool Recording { get; set; } = false; // Recording enabled / disabled
-
+        // None.
     }
 }

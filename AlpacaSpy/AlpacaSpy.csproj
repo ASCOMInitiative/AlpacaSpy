@@ -98,7 +98,8 @@
     <PackageReference Include="ASCOM.Alpaca.Components" Version="4.0.0-rc.6" />
     <PackageReference Include="ASCOM.Alpaca.Razor" Version="0.6.0-alpha02" />
     <PackageReference Include="ASCOM.Tools" Version="4.0.0-rc.6" />
-    <PackageReference Include="Radzen.Blazor" Version="11.0.5" />
+    <PackageReference Include="Microsoft.OpenApi" Version="3.7.0" />
+    <PackageReference Include="Radzen.Blazor" Version="11.1.0" />
   </ItemGroup>
 
 </Project>

@@ -115,7 +115,7 @@ namespace AlpacaSpy
                 responseMessage = await client.SendAsync(forwardRequest, HttpCompletionOption.ResponseContentRead);
                 responseBytes = await responseMessage.Content.ReadAsByteArrayAsync();
                 DateTime responseFromDevice = DateTime.Now;
-                if (device.Recording)
+                if (device.RecordTransactions)
                 {
                     AlpacaTransaction transaction = new AlpacaTransaction()
                     {
@@ -166,7 +166,8 @@ namespace AlpacaSpy
                     }
 
                     // Save the transaction for later replaying
-                    state.Transactions[device].Add(transaction);
+                    for (int i = 1; i <= 1000; i++)
+                        state.Transactions[device].Add(transaction);
                 }
             }
             catch (Exception ex)

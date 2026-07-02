@@ -53,8 +53,8 @@
                     <strong style="margin-right:auto;">Recording State</strong> <span>(Not persisted)</span>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
                         <span style="margin-bottom:24px;min-width:205px;">
-                            <RadzenCheckBox Value="device.Recording"
-                                            ValueChanged="@((bool v) => { device.Recording = v;})"
+                            <RadzenCheckBox Value="device.RecordTransactions"
+                                            ValueChanged="@((bool v) => { device.RecordTransactions = v;})"
                                             Name="@($"rec_{device.UniqueId}")" />
                             <label>Recording enabled</label>
                         </span>
@@ -94,7 +94,7 @@
                     </div>
                 </div>
                 <div>
-                    <RadzenProgressBar @bind-Value="@exportProgress" AriaLabel="Progress" Style="margin-top:24px;"/>
+                    <RadzenProgressBar @bind-Value="@exportProgress" AriaLabel="Progress" Style="margin-top:24px;" />
                 </div>
             </RadzenTabsItem>
         }
@@ -119,40 +119,63 @@
         }
         try
         {
+            // Set the recording file path and reset the progress counter
             defaultExportPath = Path.Combine(TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}{(device.RecordFileUniqueIds ? "." + Convert.ToInt32(DateTime.Now.TimeOfDay.TotalSeconds) : "")}.json");
+            exportProgress = 0.0;
 
+            // Notify the UI that values have changed and wait 100ms for the UI to respond before writing rfecords.
             await InvokeAsync(StateHasChanged);
-
+            await Task.Delay(100);
+            // Write records to disk as a JSON file
             using (Stream output = new FileStream(defaultExportPath, FileMode.Create))
             {
-                var options = new JsonWriterOptions
+                // Create JSON writing options
+                JsonWriterOptions options = new JsonWriterOptions
                 {
                     Indented = true,
                     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                     SkipValidation = false
                 };
 
+                // Create a JSON writer around the file stream
                 using var writer = new Utf8JsonWriter(output, options);
 
+                // Write the opening of the JSON array
                 writer.WriteStartArray();
 
+                // Fet the total number of records to be written as an efficient local variable
                 int total = state.Transactions[device].Count;
-                for (int i = 0; i < total; i++)
-                {
-                    JsonSerializer.Serialize(writer, state.Transactions[device].ToArray()[i]);
 
-                    // Flush occasionally so the file grows continuously
-                    if (i % 100 == 0)
+                // Initialise the loop counter for the progress bar.
+                int i = 0;
+
+                // Loop over each transaction, writing it to disk
+                foreach (var transaction in state.Transactions[device])
+                {
+                    // Serialise the transaction
+                    JsonSerializer.Serialize(writer, transaction);
+
+                    // Flush and report progress every 1000 transactions
+                    if (i % 1000 == 0)
+                    {
+                        // Flush the stream to disk so the file grows continuously
                         await writer.FlushAsync();
 
-                    // Report progress
-                    exportProgress = i * 100 / total;
-                    await InvokeAsync(StateHasChanged);
+                        // Report progress
+                        exportProgress = (100.0 * i) / total;
+                        await InvokeAsync(StateHasChanged);
+                    }
+                    i++;
                 }
 
+                // Write JSON end of array text
                 writer.WriteEndArray();
+
+                // Flush everything to disk
                 await writer.FlushAsync();
-                exportProgress =100.0;
+
+                // Notify the UI that the export is complete
+                exportProgress = 100.0;
                 await InvokeAsync(StateHasChanged);
             }
         }
@@ -162,34 +185,8 @@
             await DialogService.Alert($"An error occurred while exporting, see Home page for details: {ex.Message}", "Unable to Export", null);
         }
 
+        // Show a successful outcome dialogue.
         await DialogService.Alert("Export completed successfully", "Export Outcome", null);
-    }
-
-    public class FixedSizeConcurrentQueue<T>
-    {
-        private readonly System.Collections.Concurrent.ConcurrentQueue<T> _queue = new();
-        private readonly int _maxSize;
-
-        public FixedSizeConcurrentQueue(int maxSize)
-        {
-            if (maxSize <= 0)
-                throw new ArgumentOutOfRangeException(nameof(maxSize));
-
-            _maxSize = maxSize;
-        }
-
-        public void Add(T item)
-        {
-            _queue.Enqueue(item);
-
-            // Trim old items if we exceed the limit
-            while (_queue.Count > _maxSize)
-                _queue.TryDequeue(out _);
-        }
-
-        public int Count => _queue.Count;
-
-        public T[] ToArray() => _queue.ToArray();
     }
 
     public ValueTask DisposeAsync()
