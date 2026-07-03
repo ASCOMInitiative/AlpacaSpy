@@ -104,9 +104,11 @@
         else
         {
             var root = baseRootPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var displayName = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar));
+            if (string.IsNullOrEmpty(displayName)) displayName = root;
             <div class="tree-node">
                 <button class="expander" @onclick="() => ToggleExpand(root)">@(IsExpanded(root) ? "▼" : "▶")</button>
-                <span class="node-label" @onclick="() => SelectPath(root)">Documents</span>
+                <span class="node-label" @onclick="() => SelectPath(root)">@displayName</span>
                 @if (IsExpanded(root))
                 {
                     <div class="children" style="margin-left:16px">
