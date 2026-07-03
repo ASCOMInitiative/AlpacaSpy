@@ -3,6 +3,8 @@
 
 <style>
 .file-browser { position: relative; }
+/* shared font size so directory labels and file list items match */
+:root { --dir-font-size: 14px; }
 .directory-tree .expander {
   width: 18px;
   height: 18px;
@@ -22,6 +24,7 @@
   vertical-align: middle;
   cursor: pointer;
   display: inline-block;
+  font-size: var(--dir-font-size);
 }
 .directory-tree .children { margin-left: 12px; }
 .tree-node { margin: 2px 0; }
@@ -42,11 +45,12 @@
   border-radius: 6px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.12);
   z-index: 1000;
+  font-size: var(--dir-font-size);
 }
-.file-list-box h3 { margin: 0 0 6px 0; font-size: 14px; }
-.file-list-box .path { font-size: 11px; color: #666; margin-bottom: 6px; word-break: break-all; }
+.file-list-box h3 { margin: 0 0 6px 0; font-size: var(--dir-font-size); }
+.file-list-box .path { font-size: var(--dir-font-size); color: #666; margin-bottom: 6px; word-break: break-all; }
 .file-list-box ul { margin: 0; padding-left: 16px; list-style: disc; }
-.file-list-box li { padding: 4px 0; border-bottom: 1px dashed #f0f0f0; font-size: 13px; }
+.file-list-box li { padding: 4px 0; border-bottom: 1px dashed #f0f0f0; font-size: var(--dir-font-size); }
 </style>
 
 <div class="file-browser">
