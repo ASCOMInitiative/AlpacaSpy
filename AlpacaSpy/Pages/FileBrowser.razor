@@ -201,6 +201,17 @@
             dirCache.Clear();
             expanded.Clear();
             selectedFileFullName = null;
+
+            // Select the first child directory under Documents (or Documents itself if none)
+            var children = GetDirectoriesCached(docs).ToList();
+            if (children.Any())
+            {
+                SelectPath(children.First());
+            }
+            else
+            {
+                SelectPath(docs);
+            }
         }
     }
 
@@ -211,6 +222,13 @@
         dirCache.Clear();
         expanded.Clear();
         selectedFileFullName = null;
+
+        // Select the first drive if present
+        var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
+        if (firstDrive != null && Directory.Exists(firstDrive.Name))
+        {
+            SelectPath(firstDrive.Name);
+        }
     }
 
     void ShowAscomLogs()
@@ -228,6 +246,20 @@
             dirCache.Clear();
             expanded.Clear();
             selectedFileFullName = null;
+
+            // Select the first child under ASCOM logs, or the directory itself if no children
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+                var children = GetDirectoriesCached(dir).ToList();
+                if (children.Any())
+                {
+                    SelectPath(children.First());
+                }
+                else
+                {
+                    SelectPath(dir);
+                }
+            }
         }
         catch
         {
@@ -237,6 +269,12 @@
             dirCache.Clear();
             expanded.Clear();
             selectedFileFullName = null;
+
+            var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
+            if (firstDrive != null && Directory.Exists(firstDrive.Name))
+            {
+                SelectPath(firstDrive.Name);
+            }
         }
     }
 
