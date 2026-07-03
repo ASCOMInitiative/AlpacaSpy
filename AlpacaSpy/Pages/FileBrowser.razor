@@ -60,6 +60,8 @@
         <RadzenButton Text="⬆ Up one level"
                       Click="@GoUpOneLevel"
                       Disabled="@string.IsNullOrEmpty(SelectedPath)" />
+        <RadzenButton Text="Documents" Click="@ShowDocuments" Style="margin-left:8px" />
+        <RadzenButton Text="Disks" Click="@ShowDisks" Style="margin-left:8px" />
 
         <span class="breadcrumb">
             @foreach (var part in BreadcrumbParts)
@@ -77,16 +79,36 @@
 
     <!-- Directory Tree -->
     <div class="directory-tree">
-        @foreach (var drive in DriveInfo.GetDrives())
+        @if (baseIsDisks)
         {
-            var drivePath = drive.Name;
+            @foreach (var drive in DriveInfo.GetDrives())
+            {
+                var drivePath = drive.Name;
+                <div class="tree-node">
+                    <button class="expander" @onclick="() => ToggleExpand(drivePath)">@(IsExpanded(drivePath) ? "▼" : "▶")</button>
+                    <span class="node-label" @onclick="() => SelectPath(drivePath)">@drivePath</span>
+                    @if (IsExpanded(drivePath))
+                    {
+                        <div class="children" style="margin-left:16px">
+                            @foreach (var dir in GetDirectoriesCached(drivePath))
+                            {
+                                @RenderDirectory(dir)
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else
+        {
+            var root = baseRootPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             <div class="tree-node">
-                <button class="expander" @onclick="() => ToggleExpand(drivePath)">@(IsExpanded(drivePath) ? "▼" : "▶")</button>
-                <span class="node-label" @onclick="() => SelectPath(drivePath)">@drivePath</span>
-                @if (IsExpanded(drivePath))
+                <button class="expander" @onclick="() => ToggleExpand(root)">@(IsExpanded(root) ? "▼" : "▶")</button>
+                <span class="node-label" @onclick="() => SelectPath(root)">Documents</span>
+                @if (IsExpanded(root))
                 {
                     <div class="children" style="margin-left:16px">
-                        @foreach (var dir in GetDirectoriesCached(drivePath))
+                        @foreach (var dir in GetDirectoriesCached(root))
                         {
                             @RenderDirectory(dir)
                         }
@@ -133,6 +155,10 @@
     Dictionary<string, List<string>> dirCache = new();
     HashSet<string> expanded = new();
 
+    // base mode: true = show disks (DriveInfo), false = show single baseRootPath (Documents)
+    bool baseIsDisks = true;
+    string? baseRootPath = null;
+
     // currently selected file for replay (full path); null = none selected
     string? selectedFileFullName = null;
 
@@ -155,6 +181,28 @@
     }
 
     bool IsExpanded(string path) => expanded.Contains(path);
+
+    void ShowDocuments()
+    {
+        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        if (!string.IsNullOrEmpty(docs) && Directory.Exists(docs))
+        {
+            baseIsDisks = false;
+            baseRootPath = docs;
+            dirCache.Clear();
+            expanded.Clear();
+            selectedFileFullName = null;
+        }
+    }
+
+    void ShowDisks()
+    {
+        baseIsDisks = true;
+        baseRootPath = null;
+        dirCache.Clear();
+        expanded.Clear();
+        selectedFileFullName = null;
+    }
 
     void SelectPath(string path)
     {
