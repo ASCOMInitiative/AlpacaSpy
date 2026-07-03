@@ -2,6 +2,7 @@
 @inject FileBrowserService Browser
 
 <style>
+.file-browser { position: relative; }
 .directory-tree .expander {
   width: 18px;
   height: 18px;
@@ -24,6 +25,26 @@
 }
 .directory-tree .children { margin-left: 12px; }
 .tree-node { margin: 2px 0; }
+
+/* Floating JSON file list box (top-right) */
+.file-list-box {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 340px;
+  max-height: 60vh;
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  padding: 8px;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  z-index: 1000;
+}
+.file-list-box h3 { margin: 0 0 6px 0; font-size: 14px; }
+.file-list-box .path { font-size: 11px; color: #666; margin-bottom: 6px; word-break: break-all; }
+.file-list-box ul { margin: 0; padding-left: 16px; list-style: disc; }
+.file-list-box li { padding: 4px 0; border-bottom: 1px dashed #f0f0f0; font-size: 13px; }
 </style>
 
 <div class="file-browser">
@@ -69,17 +90,19 @@
         }
     </div>
 
-    <!-- File list -->
+    <!-- File list (floating top-right) -->
     @if (SelectedPath != null)
     {
-        <h3>JSON files in @SelectedPath</h3>
-
-        <ul>
-            @foreach (var file in Files)
-            {
-                <li>@file.Name</li>
-            }
-        </ul>
+        <div class="file-list-box">
+            <h3>JSON files</h3>
+            <div class="path">@SelectedPath</div>
+            <ul>
+                @foreach (var file in Files)
+                {
+                    <li>@file.Name</li>
+                }
+            </ul>
+        </div>
     }
 </div>
 
