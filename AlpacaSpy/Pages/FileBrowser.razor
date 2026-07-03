@@ -419,8 +419,25 @@ else
         ExpandAncestors(path);
 
         // make sure the selected node itself is expanded so its children are visible
-        expanded.Add(NormalizePath(path));
-        _ = GetDirectoriesCached(path);
+        var normPath = NormalizePath(path);
+        expanded.Add(normPath);
+
+        // Force refresh of parent's child list so UI re-renders with updated entries
+        try
+        {
+            var parent = Directory.GetParent(path);
+            if (parent != null)
+            {
+                var parentKey = NormalizePath(parent.FullName);
+                // remove cached children for parent to force re-fetch
+                dirCache.Remove(parentKey);
+                // prefetch updated children
+                _ = GetDirectoriesCached(parent.FullName);
+                // ensure parent is marked expanded so its children are shown
+                expanded.Add(parentKey);
+            }
+        }
+        catch { }
 
         // clear any previous selection when navigating so radios are initially unselected
         selectedFileFullName = null;
