@@ -92,20 +92,24 @@
         }
     </div>
 
-    <!-- File list (floating top-right) -->
-    @if (SelectedPath != null)
-    {
-        <div class="file-list-box">
-            <h3>JSON files</h3>
-            <div class="path">@SelectedPath</div>
+    <!-- File list (floating top-right) - always visible -->
+    <div class="file-list-box">
+        <h3>JSON files</h3>
+        <div class="path">@(SelectedPath ?? "No folder selected")</div>
+        @if (Files != null && Files.Any())
+        {
             <ul>
                 @foreach (var file in Files)
                 {
                     <li>@file.Name</li>
                 }
             </ul>
-        </div>
-    }
+        }
+        else
+        {
+            <div class="empty">No JSON files</div>
+        }
+    </div>
 </div>
 
 @code {
