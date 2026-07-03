@@ -171,6 +171,9 @@
                     Files.Add(new System.IO.FileInfo(f));
                 }
             }
+
+            // clear any previous selection when loading a new folder so checkboxes start unchecked
+            selectedFiles.Clear();
         }
     }
 
@@ -179,8 +182,18 @@
         bool isChecked = false;
         if (e?.Value is bool b) isChecked = b;
         else if (e?.Value is string s) isChecked = s == "true" || s == "on";
-        if (isChecked) selectedFiles.Add(fullName);
-        else selectedFiles.Remove(fullName);
+
+if (isChecked)
+{
+    // single-selection behavior: clear others, add this one only
+    selectedFiles.Clear();
+    selectedFiles.Add(fullName);
+}
+else
+{
+    // unchecked -> clear selection (no selection)
+    selectedFiles.Remove(fullName);
+}
     }
 
     void Replaytransactions()
@@ -265,6 +278,9 @@
                 Files.Add(new System.IO.FileInfo(f));
             }
         }
+
+        // clear any previous selection when navigating so checkboxes are initially unchecked
+        selectedFiles.Clear();
     }
 
     void GoUpOneLevel()
