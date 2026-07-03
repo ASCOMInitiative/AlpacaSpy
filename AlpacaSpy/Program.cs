@@ -106,6 +106,10 @@ namespace AlpacaSpy
                 builder.Services.AddSingleton<Settings>(_ => settings);
                 builder.Services.AddSingleton<CircuitHandler, CircuitHandlerService>();
 
+                // Add the file browser service as a singleton
+                builder.Services.AddSingleton<FileBrowserService>();
+
+
                 WebApplication app = builder.Build();
 
                 if (!app.Environment.IsDevelopment())
