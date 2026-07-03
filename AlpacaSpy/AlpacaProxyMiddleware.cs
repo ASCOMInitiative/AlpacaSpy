@@ -166,7 +166,7 @@ namespace AlpacaSpy
                     }
 
                     // Save the transaction for later replaying
-                    for (int i = 1; i <= 1000; i++)
+                    //for (int i = 1; i <= 1000; i++)
                         state.Transactions[device].Add(transaction);
                 }
             }

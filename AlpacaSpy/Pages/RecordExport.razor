@@ -1,4 +1,4 @@
-﻿@page "/recordplayback"
+﻿@page "/recordexport"
 @inject State state
 @inject Settings settings
 @inject AlpacaSpyLogger logger
@@ -9,7 +9,7 @@
 
 @implements IAsyncDisposable
 
-<PageTitle>@Globals.APPLICATION_NAME - Record and Playback</PageTitle>
+<PageTitle>@Globals.APPLICATION_NAME - Record and Export</PageTitle>
 
 <h3>Record and Playback</h3>
 
@@ -107,14 +107,23 @@
 
     public async Task ClearEntries(ConfiguredDevice device)
     {
-        state.Transactions[device].Clear();
+        // Show a successful outcome dialogue.
+        bool? outcome = await DialogService.Confirm("Are you sure you want to clear all recoded transactions?", "Confirm Clear", new ConfirmOptions() { OkButtonText = "Yes", CancelButtonText = "No", Style = "border-radius:20px"});
+        if (outcome.HasValue && outcome.Value)
+        {
+
+            state.Transactions[device].Clear();
+            exportProgress = 0.0;
+            defaultExportPath = "";
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     public async Task ExportEntries(ConfiguredDevice device)
     {
         if (state.Transactions[device].Count == 0)
         {
-            await DialogService.Alert("No transactions have been recorded", "Unable to Export", null);
+            await DialogService.Alert("No transactions have been recorded", "Unable to Export", new ConfirmOptions() { Style = "border-radius:20px" });
             return;
         }
         try
@@ -186,7 +195,7 @@
         }
 
         // Show a successful outcome dialogue.
-        await DialogService.Alert("Export completed successfully", "Export Outcome", null);
+        await DialogService.Alert("Export completed successfully", "Export Outcome", new ConfirmOptions() { Style = "border-radius:20px" });
     }
 
     public ValueTask DisposeAsync()

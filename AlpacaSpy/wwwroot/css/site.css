@@ -173,3 +173,8 @@ fieldset legend {
     text-align: center !important;
     min-height: 48px; /* Optional: Adjusts the height to ensure enough vertical space */
 }
+
+/* Set a dialogue service border radius of 20px */
+.rz-dialog {
+    --rz-button-border-radius: 20px;
+}
