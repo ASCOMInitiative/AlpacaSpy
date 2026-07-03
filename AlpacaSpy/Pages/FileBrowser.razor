@@ -1,0 +1,133 @@
+﻿@page "/filebrowser"
+@inject FileBrowserService Browser
+
+<div class="file-browser">
+
+    <!-- Breadcrumb + Up button -->
+    <div class="breadcrumb-bar">
+        <RadzenButton Text="⬆ Up one level"
+                      Click="@GoUpOneLevel"
+                      Disabled="@string.IsNullOrEmpty(SelectedPath)" />
+
+        <span class="breadcrumb">
+            @foreach (var part in BreadcrumbParts)
+            {
+                <span class="crumb" @onclick="() => NavigateTo(part.FullPath)">
+                    @part.Name
+                </span>
+                @if (part != BreadcrumbParts.Last())
+                {
+                    <span> / </span>
+                }
+            }
+        </span>
+    </div>
+
+    <!-- Directory Tree -->
+    <RadzenTree Expand="@OnExpand" Change="@OnSelect">
+        <RadzenTreeItem Text="Computer" Value="@("root")" Expanded="true">
+            @foreach (var drive in DriveInfo.GetDrives())
+            {
+                <RadzenTreeItem Text="@drive.Name"
+                                Value="@drive.Name"
+                                HasChildren="true" />
+            }
+        </RadzenTreeItem>
+    </RadzenTree>
+
+    <!-- File list -->
+    @if (SelectedPath != null)
+    {
+        <h3>JSON files in @SelectedPath</h3>
+
+        <ul>
+            @foreach (var file in Files)
+            {
+                <li>@file.Name</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    string? SelectedPath;
+    List<System.IO.FileInfo> Files = new();
+
+    record Crumb(string Name, string FullPath);
+    List<Crumb> BreadcrumbParts = new();
+
+    async Task OnExpand(TreeExpandEventArgs args)
+    {
+        // TreeExpandEventArgs in this Radzen version doesn't expose the TreeItem directly.
+        // Use the supplied Value to discover the path if needed. For now, do nothing here.
+        var path = args.Value?.ToString();
+        await Task.CompletedTask;
+    }
+
+    async Task OnSelect(TreeEventArgs args)
+    {
+        string path = args.Value.ToString()!;
+
+        if (Directory.Exists(path))
+        {
+            SelectedPath = path;
+
+            // Update breadcrumb
+            BuildBreadcrumb(path);
+
+            // Load JSON files
+            Files = new List<System.IO.FileInfo>();
+            foreach (var f in Browser.GetFiles(path))
+            {
+                if (f != null && f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    Files.Add(new System.IO.FileInfo(f));
+                }
+            }
+        }
+    }
+
+    void BuildBreadcrumb(string path)
+    {
+        BreadcrumbParts.Clear();
+
+        var parts = path.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+
+        string current = Path.GetPathRoot(path) ?? "";
+
+        BreadcrumbParts.Add(new Crumb(current, current));
+
+        foreach (var part in parts.Skip(1))
+        {
+            current = Path.Combine(current, part);
+            BreadcrumbParts.Add(new Crumb(part, current));
+        }
+    }
+
+    void NavigateTo(string path)
+    {
+        SelectedPath = path;
+        BuildBreadcrumb(path);
+
+        Files = new List<System.IO.FileInfo>();
+        foreach (var f in Browser.GetFiles(path))
+        {
+            if (f != null && f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                Files.Add(new System.IO.FileInfo(f));
+            }
+        }
+    }
+
+    void GoUpOneLevel()
+    {
+        if (string.IsNullOrEmpty(SelectedPath))
+            return;
+
+        var parent = Directory.GetParent(SelectedPath);
+        if (parent != null)
+        {
+            NavigateTo(parent.FullName);
+        }
+    }
+}
