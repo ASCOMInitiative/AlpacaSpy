@@ -1,6 +1,31 @@
 ﻿@page "/filebrowser"
 @inject FileBrowserService Browser
 
+<style>
+.directory-tree .expander {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin-right: 6px;
+  font-size: 12px;
+  line-height: 1;
+  vertical-align: middle;
+}
+.directory-tree .expander-placeholder {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+}
+.directory-tree .node-label {
+  vertical-align: middle;
+  cursor: pointer;
+  display: inline-block;
+}
+.directory-tree .children { margin-left: 12px; }
+.tree-node { margin: 2px 0; }
+</style>
+
 <div class="file-browser">
 
     <!-- Breadcrumb + Up button -->
@@ -24,16 +49,25 @@
     </div>
 
     <!-- Directory Tree -->
-    <RadzenTree Expand="@OnExpand" Change="@OnSelect">
-        <RadzenTreeItem Text="Computer" Value="@("root")" Expanded="true">
-            @foreach (var drive in DriveInfo.GetDrives())
-            {
-                <RadzenTreeItem Text="@drive.Name"
-                                Value="@drive.Name"
-                                HasChildren="true" />
-            }
-        </RadzenTreeItem>
-    </RadzenTree>
+    <div class="directory-tree">
+        @foreach (var drive in DriveInfo.GetDrives())
+        {
+            var drivePath = drive.Name;
+            <div class="tree-node">
+                <button class="expander" @onclick="() => ToggleExpand(drivePath)">@(IsExpanded(drivePath) ? "▼" : "▶")</button>
+                <span class="node-label" @onclick="() => SelectPath(drivePath)">@drivePath</span>
+                @if (IsExpanded(drivePath))
+                {
+                    <div class="children" style="margin-left:16px">
+                        @foreach (var dir in GetDirectoriesCached(drivePath))
+                        {
+                            @RenderDirectory(dir)
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
 
     <!-- File list -->
     @if (SelectedPath != null)
@@ -56,26 +90,37 @@
     record Crumb(string Name, string FullPath);
     List<Crumb> BreadcrumbParts = new();
 
-    async Task OnExpand(TreeExpandEventArgs args)
+    // Directory tree helpers
+    Dictionary<string, List<string>> dirCache = new();
+    HashSet<string> expanded = new();
+
+    IEnumerable<string> GetDirectoriesCached(string path)
     {
-        // TreeExpandEventArgs in this Radzen version doesn't expose the TreeItem directly.
-        // Use the supplied Value to discover the path if needed. For now, do nothing here.
-        var path = args.Value?.ToString();
-        await Task.CompletedTask;
+        if (!dirCache.TryGetValue(path, out var list))
+        {
+            list = Browser.GetDirectories(path)?.ToList() ?? new List<string>();
+            dirCache[path] = list;
+        }
+        return list;
     }
 
-    async Task OnSelect(TreeEventArgs args)
+    void ToggleExpand(string path)
     {
-        string path = args.Value.ToString()!;
+        if (expanded.Contains(path))
+            expanded.Remove(path);
+        else
+            expanded.Add(path);
+    }
 
+    bool IsExpanded(string path) => expanded.Contains(path);
+
+    void SelectPath(string path)
+    {
         if (Directory.Exists(path))
         {
             SelectedPath = path;
-
-            // Update breadcrumb
             BuildBreadcrumb(path);
 
-            // Load JSON files
             Files = new List<System.IO.FileInfo>();
             foreach (var f in Browser.GetFiles(path))
             {
@@ -86,6 +131,51 @@
             }
         }
     }
+
+    RenderFragment RenderDirectory(string path) => builder =>
+    {
+        // simple recursive renderer: shows one level and an expander if children exist
+        var seq = 0;
+        builder.OpenElement(seq++, "div");
+        builder.AddAttribute(seq++, "class", "tree-node");
+
+        var hasChildren = GetDirectoriesCached(path).Any();
+        if (hasChildren)
+        {
+            builder.OpenElement(seq++, "button");
+            builder.AddAttribute(seq++, "class", "expander");
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => ToggleExpand(path)));
+            builder.AddContent(seq++, IsExpanded(path) ? "▼" : "▶");
+            builder.CloseElement();
+        }
+        else
+        {
+            // render a fixed-width placeholder so labels align with items that have an expander
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "expander-placeholder");
+            builder.CloseElement();
+        }
+
+        builder.OpenElement(seq++, "span");
+        builder.AddAttribute(seq++, "class", "node-label");
+        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => SelectPath(path)));
+        builder.AddContent(seq++, Path.GetFileName(path));
+        builder.CloseElement();
+
+        if (IsExpanded(path) && hasChildren)
+        {
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", "children");
+            builder.AddAttribute(seq++, "style", "margin-left:16px");
+            foreach (var child in GetDirectoriesCached(path))
+            {
+                builder.AddContent(seq++, RenderDirectory(child));
+            }
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
 
     void BuildBreadcrumb(string path)
     {
