@@ -1,4 +1,5 @@
 ﻿@page "/filebrowser"
+@using ASCOM.Tools
 @inject FileBrowserService Browser
 
 <style>
@@ -62,6 +63,7 @@
                       Disabled="@string.IsNullOrEmpty(SelectedPath)" />
         <RadzenButton Text="Documents" Click="@ShowDocuments" Style="margin-left:8px" />
         <RadzenButton Text="Disks" Click="@ShowDisks" Style="margin-left:8px" />
+        <RadzenButton Text="ASCOM Logs" Click="@ShowAscomLogs" Style="margin-left:8px" />
 
         <span class="breadcrumb">
             @foreach (var part in BreadcrumbParts)
@@ -161,6 +163,11 @@
 
     // currently selected file for replay (full path); null = none selected
     string? selectedFileFullName = null;
+    protected override void OnInitialized()
+    {
+        // default to ASCOM Logs view if available
+        ShowAscomLogs();
+    }
 
     IEnumerable<string> GetDirectoriesCached(string path)
     {
@@ -202,6 +209,33 @@
         dirCache.Clear();
         expanded.Clear();
         selectedFileFullName = null;
+    }
+
+    void ShowAscomLogs()
+    {
+        try
+        {
+            var dir = TraceLogger.GetDefaultLogFilePath(DateTime.Now);
+            // If TraceLogger returns a file path rather than a directory, get its directory
+            if (!string.IsNullOrEmpty(dir) && File.Exists(dir))
+            {
+                dir = Path.GetDirectoryName(dir) ?? dir;
+            }
+            baseIsDisks = false;
+            baseRootPath = dir;
+            dirCache.Clear();
+            expanded.Clear();
+            selectedFileFullName = null;
+        }
+        catch
+        {
+            // fallback to disks if ASCOM.Tools isn't available or call fails
+            baseIsDisks = true;
+            baseRootPath = null;
+            dirCache.Clear();
+            expanded.Clear();
+            selectedFileFullName = null;
+        }
     }
 
     void SelectPath(string path)
