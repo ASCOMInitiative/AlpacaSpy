@@ -28,11 +28,13 @@
 
 /* Floating JSON file list box (top-right) */
 .file-list-box {
-  position: absolute;
+  /* fixed to viewport so it remains visible while scrolling */
+  position: fixed;
   top: 12px;
   right: 12px;
   width: 340px;
-  max-height: 60vh;
+  /* ensure it never exceeds viewport height */
+  max-height: calc(100vh - 24px);
   overflow: auto;
   background: #ffffff;
   border: 1px solid #d0d0d0;
