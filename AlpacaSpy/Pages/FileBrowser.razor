@@ -98,16 +98,22 @@
 
     <!-- File list (floating top-right) - always visible -->
     <div class="file-list-box">
-        <h3>JSON files</h3>
+        <h3><b>JSON files</b></h3>
         <div class="path">@(SelectedPath ?? "No folder selected")</div>
         @if (Files != null && Files.Any())
         {
-            <ul>
+            <div class="file-checklist">
                 @foreach (var file in Files)
                 {
-                    <li>@file.Name</li>
+                    <div class="file-item">
+                        <input type="checkbox" checked="@selectedFiles.Contains(file.FullName)" @onchange="@(e => OnFileCheckboxChanged(file.FullName, e))" />
+                        <label>@file.Name</label>
+                    </div>
                 }
-            </ul>
+            </div>
+            <div style="margin-top:8px; text-align:right;">
+                <RadzenButton Text="Replay Transactions" Click="@Replaytransactions" Disabled="@(selectedFiles.Count == 0)" />
+            </div>
         }
         else
         {
@@ -126,6 +132,9 @@
     // Directory tree helpers
     Dictionary<string, List<string>> dirCache = new();
     HashSet<string> expanded = new();
+
+    // selected files for replay (store full paths)
+    HashSet<string> selectedFiles = new();
 
     IEnumerable<string> GetDirectoriesCached(string path)
     {
@@ -163,6 +172,22 @@
                 }
             }
         }
+    }
+
+    void OnFileCheckboxChanged(string fullName, ChangeEventArgs e)
+    {
+        bool isChecked = false;
+        if (e?.Value is bool b) isChecked = b;
+        else if (e?.Value is string s) isChecked = s == "true" || s == "on";
+        if (isChecked) selectedFiles.Add(fullName);
+        else selectedFiles.Remove(fullName);
+    }
+
+    void Replaytransactions()
+    {
+        // local variable containing the selected file name (first selected)
+        string? selectedFile = selectedFiles.FirstOrDefault();
+        // intentionally empty otherwise
     }
 
     RenderFragment RenderDirectory(string path) => builder =>
