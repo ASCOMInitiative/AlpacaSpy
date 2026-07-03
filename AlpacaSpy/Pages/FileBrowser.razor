@@ -159,6 +159,21 @@
     Dictionary<string, List<string>> dirCache = new();
     HashSet<string> expanded = new();
 
+    // path normalization helper to keep keys consistent (no trailing separator)
+    string NormalizePath(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return string.Empty;
+        try
+        {
+            var fp = Path.GetFullPath(path);
+            return fp.TrimEnd(Path.DirectorySeparatorChar);
+        }
+        catch
+        {
+            return path.TrimEnd(Path.DirectorySeparatorChar);
+        }
+    }
+
     // base mode: true = show disks (DriveInfo), false = show single baseRootPath (Documents)
     bool baseIsDisks = true;
     string? baseRootPath = null;
@@ -173,23 +188,27 @@
 
     IEnumerable<string> GetDirectoriesCached(string path)
     {
-        if (!dirCache.TryGetValue(path, out var list))
+        var key = NormalizePath(path);
+        if (!dirCache.TryGetValue(key, out var list))
         {
-            list = Browser.GetDirectories(path)?.ToList() ?? new List<string>();
-            dirCache[path] = list;
+            var raw = Browser.GetDirectories(path)?.ToList() ?? new List<string>();
+            // normalize child paths for consistency
+            list = raw.Select(d => NormalizePath(d)).ToList();
+            dirCache[key] = list;
         }
-        return list;
+        return dirCache[key];
     }
 
     void ToggleExpand(string path)
     {
-        if (expanded.Contains(path))
-            expanded.Remove(path);
+        var key = NormalizePath(path);
+        if (expanded.Contains(key))
+            expanded.Remove(key);
         else
-            expanded.Add(path);
+            expanded.Add(key);
     }
 
-    bool IsExpanded(string path) => expanded.Contains(path);
+    bool IsExpanded(string path) => expanded.Contains(NormalizePath(path));
 
     void ShowDocuments()
     {
@@ -399,6 +418,10 @@ else
         // ensure the tree shows the selected folder: expand its ancestors and cache their contents
         ExpandAncestors(path);
 
+        // make sure the selected node itself is expanded so its children are visible
+        expanded.Add(NormalizePath(path));
+        _ = GetDirectoriesCached(path);
+
         // clear any previous selection when navigating so radios are initially unselected
         selectedFileFullName = null;
 
@@ -426,19 +449,21 @@ else
             var p = Directory.GetParent(path);
             while (p != null)
             {
+                var key = NormalizePath(p.FullName);
+
                 // stop if we've reached the baseRootPath when in Documents/ASCOM mode
                 if (!baseIsDisks && !string.IsNullOrEmpty(baseRootPath))
                 {
-                    if (string.Equals(Path.GetFullPath(p.FullName).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(baseRootPath).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(NormalizePath(p.FullName), NormalizePath(baseRootPath), StringComparison.OrdinalIgnoreCase))
                     {
-                        expanded.Add(p.FullName);
+                        expanded.Add(key);
                         // ensure children cached
                         _ = GetDirectoriesCached(p.FullName);
                         break;
                     }
                 }
 
-                expanded.Add(p.FullName);
+                expanded.Add(key);
                 // ensure children cached
                 _ = GetDirectoriesCached(p.FullName);
 
