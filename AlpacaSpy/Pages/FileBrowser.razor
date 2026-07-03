@@ -106,13 +106,13 @@
                 @foreach (var file in Files)
                 {
                     <div class="file-item">
-                        <input type="checkbox" checked="@selectedFiles.Contains(file.FullName)" @onchange="@(e => OnFileCheckboxChanged(file.FullName, e))" />
+                        <input type="radio" name="jsonFiles" checked="@(selectedFileFullName == file.FullName)" @onchange="@(e => OnFileRadioChanged(file.FullName, e))" />
                         <label>@file.Name</label>
                     </div>
                 }
             </div>
             <div style="margin-top:8px; text-align:right;">
-                <RadzenButton Text="Replay Transactions" Click="@Replaytransactions" Disabled="@(selectedFiles.Count == 0)" />
+                <RadzenButton Text="Replay Transactions" Click="@Replaytransactions" Disabled="@(string.IsNullOrEmpty(selectedFileFullName))" />
             </div>
         }
         else
@@ -133,8 +133,8 @@
     Dictionary<string, List<string>> dirCache = new();
     HashSet<string> expanded = new();
 
-    // selected files for replay (store full paths)
-    HashSet<string> selectedFiles = new();
+    // currently selected file for replay (full path); null = none selected
+    string? selectedFileFullName = null;
 
     IEnumerable<string> GetDirectoriesCached(string path)
     {
@@ -172,34 +172,29 @@
                 }
             }
 
-            // clear any previous selection when loading a new folder so checkboxes start unchecked
-            selectedFiles.Clear();
+            // clear any previous selection when loading a new folder so radios start unselected
+            selectedFileFullName = null;
         }
     }
 
-    void OnFileCheckboxChanged(string fullName, ChangeEventArgs e)
+    void OnFileRadioChanged(string fullName, ChangeEventArgs e)
     {
-        bool isChecked = false;
-        if (e?.Value is bool b) isChecked = b;
-        else if (e?.Value is string s) isChecked = s == "true" || s == "on";
-
-if (isChecked)
+// Radio change value can be string or bool; treat any change as selection of this radio button.
+if (e?.Value is bool b && b == false)
 {
-    // single-selection behavior: clear others, add this one only
-    selectedFiles.Clear();
-    selectedFiles.Add(fullName);
+    // some browsers/components may allow unchecking; treat as no selection
+    selectedFileFullName = null;
 }
 else
 {
-    // unchecked -> clear selection (no selection)
-    selectedFiles.Remove(fullName);
+    selectedFileFullName = fullName;
 }
     }
 
     void Replaytransactions()
     {
-        // local variable containing the selected file name (first selected)
-        string? selectedFile = selectedFiles.FirstOrDefault();
+        // local variable containing the selected file name
+        string? selectedFile = selectedFileFullName;
         // intentionally empty otherwise
     }
 
@@ -279,8 +274,8 @@ else
             }
         }
 
-        // clear any previous selection when navigating so checkboxes are initially unchecked
-        selectedFiles.Clear();
+        // clear any previous selection when navigating so radios are initially unselected
+        selectedFileFullName = null;
     }
 
     void GoUpOneLevel()
