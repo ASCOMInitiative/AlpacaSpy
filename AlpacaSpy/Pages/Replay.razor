@@ -1,6 +1,8 @@
 ﻿@page "/filebrowser"
 @using ASCOM.Tools
+@using ASCOM.Common
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @inject FileBrowserService Browser
 @inject NavigationManager Navigation
 @inject AlpacaSpyLogger logger
@@ -438,6 +440,33 @@
                 }
 
                 total = doc.RootElement.GetArrayLength();
+
+                // Extract the string value of the "RequestUri" property from the first
+                // element of the top-level array, if present.
+                string? firstRequestUri = null;
+                if (total > 0)
+                {
+                    var firstElement = doc.RootElement[0];
+                    if (firstElement.ValueKind == JsonValueKind.Object && firstElement.TryGetProperty("RequestUri", out var requestUriProp) && requestUriProp.ValueKind == JsonValueKind.String)
+                    {
+                        firstRequestUri = requestUriProp.GetString();
+                        logger.LogMessage("Replaytransactions", $"First RequestUri: {firstRequestUri}");
+
+                        //Now extract the device type from the URI
+                        Regex r = new Regex(@"\/api\/v1\/(?<deviceTypeString>.*?)\/.*?", RegexOptions.IgnoreCase);
+                        var match = r.Match(firstRequestUri ?? string.Empty);
+                        if (match.Success)
+                        {
+                            var deviceTypeString = match.Groups["deviceTypeString"].Value;
+
+                            DeviceTypes deviceType = deviceTypeString.ToDeviceType();
+
+                            logger.LogMessage("Replaytransactions", $"Extracted device type: {deviceTypeString} {deviceType}");
+                        }
+
+                    }
+                }
+
             }
             logger.LogMessage("Replaytransactions", $"Completed initial parse");
 
