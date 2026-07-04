@@ -103,7 +103,9 @@
         }
         else
         {
-            var root = baseRootPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            // Show the currently selected path as the root of the visible tree when possible,
+            // falling back to the configured baseRootPath (Documents or ASCOM Logs).
+            var root = SelectedPath ?? baseRootPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var displayName = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar));
             if (string.IsNullOrEmpty(displayName)) displayName = root;
             <div class="tree-node">
