@@ -166,6 +166,10 @@
     HashSet<string> expanded = new();
 
     // path normalization helper to keep keys consistent (no trailing separator)
+    /// <summary>
+    /// Normalize a path to a full path without a trailing directory separator.
+    /// Returns an empty string for null/empty input.
+    /// </summary>
     string NormalizePath(string? path)
     {
         if (string.IsNullOrEmpty(path)) return string.Empty;
@@ -192,6 +196,10 @@
         ShowAscomLogs();
     }
 
+    /// <summary>
+    /// Return the (cached) list of subdirectories for <paramref name="path"/>.
+    /// Results are normalized and cached to avoid repeated IO.
+    /// </summary>
     IEnumerable<string> GetDirectoriesCached(string path)
     {
         var key = NormalizePath(path);
@@ -205,6 +213,9 @@
         return dirCache[key];
     }
 
+    /// <summary>
+    /// Toggle expanded/collapsed state for the specified <paramref name="path"/>.
+    /// </summary>
     void ToggleExpand(string path)
     {
         var key = NormalizePath(path);
@@ -214,8 +225,14 @@
             expanded.Add(key);
     }
 
+    /// <summary>
+    /// Returns true when the specified <paramref name="path"/> is marked expanded.
+    /// </summary>
     bool IsExpanded(string path) => expanded.Contains(NormalizePath(path));
 
+    /// <summary>
+    /// Switch the tree to show the user's Documents folder as the base and select it.
+    /// </summary>
     void ShowDocuments()
     {
         var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -235,6 +252,9 @@
         }
     }
 
+    /// <summary>
+    /// Switch the tree to show system drives (Disks) as the base and select the first drive if present.
+    /// </summary>
     void ShowDisks()
     {
         baseIsDisks = true;
@@ -251,6 +271,10 @@
         }
     }
 
+    /// <summary>
+    /// Switch the tree to the ASCOM logs directory (via TraceLogger) and select the first visible child.
+    /// Falls back to the Disks view if the ASCOM log path is unavailable.
+    /// </summary>
     void ShowAscomLogs()
     {
         try
@@ -298,6 +322,9 @@
         }
     }
 
+    /// <summary>
+    /// Select the specified directory path, update breadcrumb and load JSON files in that directory.
+    /// </summary>
     void SelectPath(string path)
     {
         if (Directory.Exists(path))
@@ -319,20 +346,28 @@
         }
     }
 
+    /// <summary>
+    /// Handle radio selection changes for JSON files. Updates the currently selected file full path.
+    /// </summary>
     void OnFileRadioChanged(string fullName, ChangeEventArgs e)
     {
-// Radio change value can be string or bool; treat any change as selection of this radio button.
-if (e?.Value is bool b && b == false)
-{
-    // some browsers/components may allow unchecking; treat as no selection
-    selectedFileFullName = null;
-}
-else
-{
-    selectedFileFullName = fullName;
-}
+        // Radio change value can be string or bool; treat any change as selection of this radio button.
+        if (e?.Value is bool b && b == false)
+        {
+            // some browsers/components may allow unchecking; treat as no selection
+            selectedFileFullName = null;
+        }
+        else
+        {
+            selectedFileFullName = fullName;
+        }
     }
 
+    /// <summary>
+    /// Entry point for replaying transactions from the selected JSON file.
+    /// Creates a local variable <c>selectedFile</c> containing the selected file full path.
+    /// Implementation is intentionally empty for now.
+    /// </summary>
     void Replaytransactions()
     {
         // local variable containing the selected file name
@@ -385,6 +420,9 @@ else
         builder.CloseElement();
     };
 
+    /// <summary>
+    /// Build the breadcrumb parts for the given <paramref name="path"/>.
+    /// </summary>
     void BuildBreadcrumb(string path)
     {
         BreadcrumbParts.Clear();
