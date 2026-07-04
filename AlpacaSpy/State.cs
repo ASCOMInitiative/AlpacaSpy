@@ -44,6 +44,8 @@ namespace AlpacaSpy
 
         public Dictionary<ConfiguredDevice, FixedCapacityList<AlpacaTransaction>> Transactions { get; set; } = new(Globals.MAXIMUM_RECORDING_FILE_ENTRIES);
 
+        public List<AlpacaTransaction> ReplayTransactions { get; set; } = new();
+
         public List<object> ProxyDevices { get; set; } = new();
 
         /// <summary>Per-device TraceLogger instances keyed by ConfiguredDevice.UniqueId.</summary>

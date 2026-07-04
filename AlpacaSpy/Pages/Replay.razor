@@ -1,6 +1,9 @@
 ﻿@page "/filebrowser"
 @using ASCOM.Tools
 @inject FileBrowserService Browser
+@inject NavigationManager Navigation
+@inject AlpacaSpyLogger logger
+@inject State state
 
 <style>
 .file-browser { position: relative; }
@@ -190,7 +193,8 @@
 
     // currently selected file for replay (full path); null = none selected
     string? selectedFileFullName = null;
-    protected override void OnInitialized()
+
+    protected override void OnInitialized()
     {
         // default to ASCOM Logs view if available
         ShowAscomLogs();
@@ -372,7 +376,12 @@
     {
         // local variable containing the selected file name
         string? selectedFile = selectedFileFullName;
-        // intentionally empty otherwise
+        // navigate to the home page
+        Navigation.NavigateTo("/");
+
+        logger.LogMessage("Replaytransactions", $"The selected file is: {selectedFile}");
+
+
     }
 
     RenderFragment RenderDirectory(string path) => builder =>
