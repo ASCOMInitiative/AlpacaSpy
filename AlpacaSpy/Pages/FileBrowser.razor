@@ -223,16 +223,11 @@
             expanded.Clear();
             selectedFileFullName = null;
 
-            // Select the first child directory under Documents (or Documents itself if none)
-            var children = GetDirectoriesCached(docs).ToList();
-            if (children.Any())
-            {
-                SelectPath(children.First());
-            }
-            else
-            {
-                SelectPath(docs);
-            }
+            // Show the Documents folder itself as the root (do not auto-select a child)
+            NavigateTo(docs);
+            // ensure the root is expanded so children are visible
+            expanded.Add(NormalizePath(docs));
+            _ = GetDirectoriesCached(docs);
         }
     }
 
