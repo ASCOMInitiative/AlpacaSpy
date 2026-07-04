@@ -10,6 +10,8 @@
 
 <style>
 .file-browser { position: relative; }
+.file-browser-content { display: flex; gap: 12px; align-items: flex-start; }
+.breadcrumb-bar { width: 100%; margin-bottom: 12px; }
 /* shared font size so directory labels and file list items match */
 :root { --dir-font-size: 14px; }
 .directory-tree .expander {
@@ -38,21 +40,20 @@
 .tree-node { margin: 2px 0; }
 
 /* Floating JSON file list box (top-right) */
+.directory-tree { flex: 1 1 auto; overflow: auto; max-height: calc(100vh - 160px); border: 1px solid #d0d0d0; padding: 8px; border-radius: 6px; background: #ffffff; }
+
 .file-list-box {
-  /* fixed to viewport so it remains visible while scrolling */
-  position: fixed;
-  top: 12px;
-  right: 12px;
+  /* Render as a fixed right-hand column next to the directory tree */
+  flex: 0 0 340px;
   width: 340px;
   /* ensure it never exceeds viewport height */
   max-height: calc(100vh - 24px);
   overflow: auto;
   background: #ffffff;
-  border: 1px solid #d0d0d0;
+  border: 1px solid #d0d0d0; /* thin bounding line */
   padding: 8px;
   border-radius: 6px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-  z-index: 1000;
+  box-shadow: none;
   font-size: var(--dir-font-size);
 }
 .file-list-box h3 { margin: 0 0 6px 0; font-size: var(--dir-font-size); }
@@ -112,6 +113,7 @@
     </div>
 
     <!-- Directory Tree -->
+    <div class="file-browser-content">
     <div class="directory-tree">
         @if (baseIsDisks)
         {
@@ -182,6 +184,7 @@
         {
             <div class="empty">No JSON files</div>
         }
+    </div>
     </div>
 </div>
 
