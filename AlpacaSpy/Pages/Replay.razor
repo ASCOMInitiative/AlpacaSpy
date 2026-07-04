@@ -54,6 +54,10 @@
 .file-list-box li { padding: 4px 0; border-bottom: 1px dashed #f0f0f0; font-size: var(--dir-font-size); }
 </style>
 
+<PageTitle>@Globals.APPLICATION_NAME - Rep;lay Recordings</PageTitle>
+
+<h3>Replay Recordings</h3>
+
 <div class="file-browser">
 
     <!-- Breadcrumb + Up button -->
@@ -127,7 +131,7 @@
     <!-- File list (floating top-right) - always visible -->
     <div class="file-list-box">
         <h3><b>JSON files</b></h3>
-        <div class="path">@(SelectedPath ?? "No folder selected")</div>
+        <div class="path">@(SelectedPath is null? "No folder selected":"")</div>
         @if (Files != null && Files.Any())
         {
             <div class="file-checklist">

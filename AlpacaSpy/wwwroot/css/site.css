@@ -178,3 +178,7 @@ fieldset legend {
 .rz-dialog {
     --rz-button-border-radius: 20px;
 }
+
+.rz-dialog-alert-buttons .rz-button {
+    min-width: 70px !important;
+}

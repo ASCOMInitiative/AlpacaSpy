@@ -11,7 +11,7 @@
 
 <PageTitle>@Globals.APPLICATION_NAME - Record and Export</PageTitle>
 
-<h3>Record and Playback</h3>
+<h3>Record and Export</h3>
 
 <h4 style="margin-top:24px;">Settings</h4>
 <RadzenTabs>
@@ -50,13 +50,13 @@
                                           Style="border-radius:20px; text-transform:none;" />
                         </span>
                     </div>
-                    <strong style="margin-right:auto;">Recording State</strong> <span>(Not persisted)</span>
+                    <strong style="margin-right:auto;">Recording State</strong>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
                         <span style="margin-bottom:24px;min-width:205px;">
                             <RadzenCheckBox Value="device.RecordTransactions"
                                             ValueChanged="@((bool v) => { device.RecordTransactions = v;})"
                                             Name="@($"rec_{device.UniqueId}")" />
-                            <label>Recording enabled</label>
+                            <label>Record commands from clients and device responses</label>
                         </span>
                     </div>
                     <strong style="margin-top:24px;margin-right:auto;">Configuration</strong>
