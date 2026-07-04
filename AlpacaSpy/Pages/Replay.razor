@@ -1,5 +1,6 @@
 ﻿@page "/filebrowser"
 @using ASCOM.Tools
+@using System.Text.Json
 @inject FileBrowserService Browser
 @inject NavigationManager Navigation
 @inject AlpacaSpyLogger logger
@@ -18,6 +19,7 @@
   line-height: 1;
   vertical-align: middle;
 }
+
 .directory-tree .expander-placeholder {
   display: inline-block;
   width: 18px;
@@ -60,6 +62,27 @@
 <PageTitle>@Globals.APPLICATION_NAME - Rep;lay Recordings</PageTitle>
 
 <h3>Replay Recordings</h3>
+
+<h4>Select Target Device</h4>
+
+<div class="target-device-list">
+    @if (state.ConfiguredDevices != null && state.ConfiguredDevices.Any())
+    {
+        @foreach (var device in state.ConfiguredDevices)
+        {
+            <div>
+                <input type="radio" name="targetDevice" id="@device.UniqueId" checked="@(targetDevice?.UniqueId == device.UniqueId)" @onchange="() => SelectTargetDevice(device)" />
+                <label for="@device.UniqueId">@($"{device.DeviceType}/{device.ProxyDeviceNumber} {device.IpAddress}")</label>
+            </div>
+        }
+    }
+    else
+    {
+        <div>No configured devices</div>
+    }
+</div>
+
+<h4 style="margin-top:36px;">Select Replay File</h4>
 
 <div class="file-browser">
 
@@ -146,8 +169,11 @@
                     </div>
                 }
             </div>
-            <div style="margin-top:8px; text-align:right;">
+                <div style="margin-top:8px; text-align:right;">
                 <RadzenButton Text="Replay Transactions" Click="@Replaytransactions" Disabled="@(string.IsNullOrEmpty(selectedFileFullName))" />
+                <div style="margin-top:8px;">
+                    <RadzenProgressBar @bind-Value="@replayProgress" AriaLabel="Replay Progress" Style="width:240px;" />
+                </div>
             </div>
         }
         else
@@ -193,6 +219,9 @@
 
     // currently selected file for replay (full path); null = none selected
     string? selectedFileFullName = null;
+    // selected target device for replay; null = none selected
+    AlpacaSpy.Models.ConfiguredDevice? targetDevice = null;
+    double replayProgress = 0.0;
 
     protected override void OnInitialized()
     {
@@ -227,6 +256,11 @@
             expanded.Remove(key);
         else
             expanded.Add(key);
+    }
+
+    void SelectTargetDevice(AlpacaSpy.Models.ConfiguredDevice device)
+    {
+        targetDevice = device;
     }
 
     /// <summary>
@@ -372,16 +406,83 @@
     /// Creates a local variable <c>selectedFile</c> containing the selected file full path.
     /// Implementation is intentionally empty for now.
     /// </summary>
-    void Replaytransactions()
+    async Task Replaytransactions()
     {
         // local variable containing the selected file name
         string? selectedFile = selectedFileFullName;
-        // navigate to the home page
-        Navigation.NavigateTo("/");
 
-        logger.LogMessage("Replaytransactions", $"The selected file is: {selectedFile}");
+        if (string.IsNullOrEmpty(selectedFile) || !File.Exists(selectedFile))
+        {
+            logger.LogError("Replaytransactions", "No file selected or file does not exist.");
+            return;
+        }
+
+        replayProgress = 0.0;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var items = new List<AlpacaTransaction>();
+            var total = 0;
+
+            logger.LogMessage("Replaytransactions", $"Starting initial parse");
+
+            using (FileStream? countStream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var doc = await JsonDocument.ParseAsync(countStream))
+            {
+                if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+                {
+                    logger.LogError("Replaytransactions", "Selected JSON file does not contain a top-level array.");
+                    return;
+                }
+
+                total = doc.RootElement.GetArrayLength();
+            }
+            logger.LogMessage("Replaytransactions", $"Completed initial parse");
+
+            using (FileStream? fs = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                var processed = 0;
+                await foreach (AlpacaTransaction? txn in JsonSerializer.DeserializeAsyncEnumerable<AlpacaTransaction>(fs, options))
+                {
+                    if (txn is null)
+                    {
+                        continue;
+                    }
+
+                    items.Add(txn);
+                    processed++;
+
+                    if (total > 0)
+                    {
+                        replayProgress = (100.0 * processed) / total;
+                    }
+                    else
+                    {
+                        replayProgress = 100.0;
+                    }
+
+                    if (processed % 100 == 0 || processed == total)
+                    {
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }
+            }
+
+            state.ReplayTransactions = items;
+            replayProgress = 100.0;
+            await InvokeAsync(StateHasChanged);
+            Navigation.NavigateTo("/");
+            logger.LogMessage("Replaytransactions", $"Replaying {items.Count} transactions from: {selectedFile}");
 
 
+
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Replaytransactions", $"Error replaying file '{selectedFile}': {ex.Message}");
+        }
     }
 
     RenderFragment RenderDirectory(string path) => builder =>
