@@ -522,7 +522,7 @@
 
             // Determine the device type of the recorded file by opening it as a JSON document and extracting the device type from first URL entry
             Logger.LogMessage("ReplayTransactions", $"Starting initial parse");
-            using (FileStream? countStream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read)) // Open the file as a file stream 
+            using (FileStream? countStream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read)) // Open the file as a file stream
             using (var jsonDocument = await JsonDocument.ParseAsync(countStream)) // Read the file as a JSON document
             {
                 // Check that the document does contain a JSON array
@@ -585,54 +585,68 @@
                     return;
                 }
             }
-
             Logger.LogDebug("ReplayTransactions", $"Completed initial parse");
 
-            using (FileStream? fs = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+            // Now read in the file as an array of AlpacaTransactions
+            using (FileStream? readFilestream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 var processed = 0;
-                await foreach (AlpacaTransaction? txn in JsonSerializer.DeserializeAsyncEnumerable<AlpacaTransaction>(fs, options))
+                await foreach (AlpacaTransaction? alpacaTransaction in JsonSerializer.DeserializeAsyncEnumerable<AlpacaTransaction>(readFilestream, options))
                 {
-                    if (txn is null)
+                    // Ignore any failed AlpacaTransaction de-serialisations
+                    if (alpacaTransaction is null)
                     {
                         continue;
                     }
 
-                    items.Add(txn);
+                    // SAve each transaction as it is de-serialised
+                    items.Add(alpacaTransaction);
+
+                    // Increment the progress counter and calculate progress percent
                     processed++;
 
-                    if (total > 0)
-                    {
-                        replayProgress = (100.0 * processed) / total;
-                    }
-                    else
-                    {
-                        replayProgress = 100.0;
-                    }
-
+                    // Update the progress UI every 100 transactions read
                     if (processed % 100 == 0 || processed == total)
                     {
+                        replayProgress = 100.0 * processed / total;
                         await InvokeAsync(StateHasChanged);
                     }
                 }
             }
 
+            // SAve the extracted transactions to current state
             State.ReplayTransactions = items;
+
+            // Force the progress bar to 100%
             replayProgress = 100.0;
             await InvokeAsync(StateHasChanged);
+
+            // Navigate the the home page to show the logging screen
             Navigation.NavigateTo("/");
+
+            // Notify what we are doikng
             Logger.LogMessage("ReplayTransactions", $"Replaying {items.Count} transactions from: {selectedFile} Target device type: {State.ReplayTargetDevice?.DeviceType}");
 
+            // Create an HTTP client to send commands to the selected device
             HttpClient client = HttpClientFactory.CreateClient();
+
+            // Send each recorded item to the selected device in turn and log the outcome
             foreach (AlpacaTransaction transaction in items)
             {
-                string targetURI = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice.PortNumber}{transaction.RequestUri}";
-                Logger.LogMessage("ReplayTransactions", $"Calling: {targetURI}, Received: {transaction.Response?.RootElement.GetRawText()}");
+                // Create the target URI based on the targe device's IP address, port and Alpaca device number
+                string targetURI = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}{transaction.RequestUri}";
+                Logger.LogMessage("ReplayTransactions", $"Calling: {targetURI}, Original response: {transaction.Response?.RootElement.GetRawText()}");
+
+                // Construct an HTTP request for the target device
                 HttpRequestMessage request = new HttpRequestMessage(new HttpMethod(transaction.RequestMethod), targetURI);
-                if(transaction.RequestBody != "")
+
+                // If the original transaction contained a request body, add it to this request 
+                if (transaction.RequestBody != "") // There is a request body so add it
                 {
                     request.Content = new StringContent(transaction.RequestBody, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
                 }
+
+                // Send the request to the target device and wait for a response
                 await client.SendAsync(request).ContinueWith(async responseTask =>
                 {
                     try
