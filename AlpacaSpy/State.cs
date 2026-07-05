@@ -46,6 +46,8 @@ namespace AlpacaSpy
 
         public List<AlpacaTransaction> ReplayTransactions { get; set; } = new();
 
+        public ConfiguredDevice? ReplayTargetDevice { get; set; } = null;
+
         public List<object> ProxyDevices { get; set; } = new();
 
         /// <summary>Per-device TraceLogger instances keyed by ConfiguredDevice.UniqueId.</summary>

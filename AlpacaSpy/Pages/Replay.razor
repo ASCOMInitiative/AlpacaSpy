@@ -5,8 +5,10 @@
 @using System.Text.RegularExpressions
 @inject FileBrowserService Browser
 @inject NavigationManager Navigation
-@inject AlpacaSpyLogger logger
-@inject State state
+@inject AlpacaSpyLogger Logger
+@inject State State
+@inject IHttpClientFactory HttpClientFactory
+@inject DialogService DialogService
 
 <style>
     .title-row {
@@ -128,12 +130,12 @@
 <h4>Select Target Device</h4>
 
 <div class="target-device-list">
-    @if (state.ConfiguredDevices != null && state.ConfiguredDevices.Any())
+    @if (State.ConfiguredDevices != null && State.ConfiguredDevices.Any())
     {
-        @foreach (var device in state.ConfiguredDevices)
+        @foreach (var device in State.ConfiguredDevices)
         {
             <div>
-                <input type="radio" name="targetDevice" id="@device.UniqueId" checked="@(targetDevice?.UniqueId == device.UniqueId)" @onchange="() => SelectTargetDevice(device)" />
+                <input type="radio" name="targetDevice" id="@device.UniqueId" checked="@(State.ReplayTargetDevice?.UniqueId == device.UniqueId)" @onchange="() => SelectTargetDevice(device)" />
                 <label for="@device.UniqueId">@($"{device.DeviceType}/{device.ProxyDeviceNumber} {device.IpAddress}")</label>
             </div>
         }
@@ -146,9 +148,9 @@
 
 <div class="title-row" style="margin-top:36px;">
     <h4>Select Replay File</h4>
-    @if (targetDevice is null)
+    @if (State.ReplayTargetDevice is null)
     {
-        <span class="right-text" style="color:red">(Must select target device first)</span>
+        <span class="right-text" style="color:red">(Select target device first)</span>
     }
 </div>
 
@@ -158,17 +160,17 @@
     <div class="breadcrumb-bar">
         <RadzenButton Text="⬆ Up one level"
                       Click="@GoUpOneLevel"
-                      Disabled="@(string.IsNullOrEmpty(SelectedPath) || targetDevice is null )" />
+                      Disabled="@(string.IsNullOrEmpty(SelectedPath) || State.ReplayTargetDevice is null )" />
         <RadzenButton Text="Documents"
-                      Disabled="@(targetDevice is null )"
+                      Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDocuments"
                       Style="margin-left:8px" />
         <RadzenButton Text="Disks"
-                      Disabled="@(targetDevice is null )"
+                      Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDisks"
                       Style="margin-left:8px" />
         <RadzenButton Text="ASCOM Logs"
-                      Disabled="@(targetDevice is null )"
+                      Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowAscomLogs"
                       Style="margin-left:8px" />
 
@@ -194,7 +196,7 @@
     </div>
 
     <!-- Directory Tree -->
-    <div class="file-browser-content" style="display:@(targetDevice is null ? "none" : "flex")">
+    <div class="file-browser-content" style="display:@(State.ReplayTargetDevice is null ? "none" : "flex")">
         <div class="directory-tree">
             @if (baseIsDisks)
             {
@@ -239,7 +241,7 @@
             }
         </div>
 
-        <!-- File list (floating top-right) - always visible -->
+        <!-- File list -->
         <div class="file-list-box">
             <h3><b>JSON files</b></h3>
             <div class="path">@(SelectedPath is null ? "No folder selected" : "")</div>
@@ -255,7 +257,7 @@
                     }
                 </div>
                 <div style="margin-top:8px; text-align:right;">
-                    <RadzenButton Text="Replay Transactions" Click="@Replaytransactions" Disabled="@(string.IsNullOrEmpty(selectedFileFullName))" />
+                    <RadzenButton Text="Replay Transactions" Click="@ReplayTransactions" Disabled="@(string.IsNullOrEmpty(selectedFileFullName))" />
                     <div style="margin-top:8px;">
                         <RadzenProgressBar @bind-Value="@replayProgress" AriaLabel="Replay Progress" Style="width:240px;" />
                     </div>
@@ -270,6 +272,11 @@
 </div>
 
 @code {
+    protected override Task OnInitializedAsync()
+    {
+        return base.OnInitializedAsync();
+    }
+
     string? SelectedPath;
     List<System.IO.FileInfo> Files = new();
 
@@ -305,8 +312,7 @@
 
     // currently selected file for replay (full path); null = none selected
     string? selectedFileFullName = null;
-    // selected target device for replay; null = none selected
-    AlpacaSpy.Models.ConfiguredDevice? targetDevice = null;
+
     double replayProgress = 0.0;
 
     protected override void OnInitialized()
@@ -346,7 +352,7 @@
 
     void SelectTargetDevice(AlpacaSpy.Models.ConfiguredDevice device)
     {
-        targetDevice = device;
+        State.ReplayTargetDevice = device;
     }
 
     /// <summary>
@@ -492,17 +498,19 @@
     /// Creates a local variable <c>selectedFile</c> containing the selected file full path.
     /// Implementation is intentionally empty for now.
     /// </summary>
-    async Task Replaytransactions()
+    async Task ReplayTransactions()
     {
         // local variable containing the selected file name
         string? selectedFile = selectedFileFullName;
 
+        // MAke sure the selected file really does exist
         if (string.IsNullOrEmpty(selectedFile) || !File.Exists(selectedFile))
         {
-            logger.LogError("Replaytransactions", "No file selected or file does not exist.");
+            Logger.LogError("ReplayTransactions", "No file selected or file does not exist.");
             return;
         }
 
+        // Reset progress to 0
         replayProgress = 0.0;
         await InvokeAsync(StateHasChanged);
 
@@ -512,47 +520,73 @@
             var items = new List<AlpacaTransaction>();
             var total = 0;
 
-            logger.LogMessage("Replaytransactions", $"Starting initial parse");
-
-            using (FileStream? countStream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var doc = await JsonDocument.ParseAsync(countStream))
+            // Determine the device type of the recorded file by opening it as a JSON document and extracting the device type from first URL entry
+            Logger.LogMessage("ReplayTransactions", $"Starting initial parse");
+            using (FileStream? countStream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read)) // Open the file as a file stream 
+            using (var jsonDocument = await JsonDocument.ParseAsync(countStream)) // Read the file as a JSON document
             {
-                if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+                // Check that the document does contain a JSON array
+                if (jsonDocument.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array) // No array found
                 {
-                    logger.LogError("Replaytransactions", "Selected JSON file does not contain a top-level array.");
+                    Logger.LogError("ReplayTransactions", "The selected JSON file does not contain a top-level array.");
+                    await DialogService.Alert($"The selected JSON file does not contain a top-level array.", "Unable to Replay", null);
                     return;
                 }
 
-                total = doc.RootElement.GetArrayLength();
+                // Get the overall number of entries so we can show the % progress
+                total = jsonDocument.RootElement.GetArrayLength();
 
-                // Extract the string value of the "RequestUri" property from the first
-                // element of the top-level array, if present.
+                // Extract the string value of the "RequestUri" property from the first element of the top-level array, if present.
                 string? firstRequestUri = null;
-                if (total > 0)
+                if (total > 0) // At least one array element in the JSOn file
                 {
-                    var firstElement = doc.RootElement[0];
-                    if (firstElement.ValueKind == JsonValueKind.Object && firstElement.TryGetProperty("RequestUri", out var requestUriProp) && requestUriProp.ValueKind == JsonValueKind.String)
+                    // Get the first element in the array
+                    JsonElement firstElement = jsonDocument.RootElement[0];
+                    // Check whether we can read the value of RequestUri in the first array element
+                    if (firstElement.ValueKind == JsonValueKind.Object && firstElement.TryGetProperty("RequestUri", out var requestUriProp) && requestUriProp.ValueKind == JsonValueKind.String) // Found OK
                     {
+                        // Get the request URI
                         firstRequestUri = requestUriProp.GetString();
-                        logger.LogMessage("Replaytransactions", $"First RequestUri: {firstRequestUri}");
+                        Logger.LogDebug("ReplayTransactions", $"First RequestUri: {firstRequestUri}");
 
-                        //Now extract the device type from the URI
-                        Regex r = new Regex(@"\/api\/v1\/(?<deviceTypeString>.*?)\/.*?", RegexOptions.IgnoreCase);
+                        //Extract the device type from the URI using a regex
+                        Regex r = new Regex(@"\/api\/v1\/(?<DeviceTypeString>.*?)\/.*?", RegexOptions.IgnoreCase);
                         var match = r.Match(firstRequestUri ?? string.Empty);
-                        if (match.Success)
-                        {
-                            var deviceTypeString = match.Groups["deviceTypeString"].Value;
 
+                        // Check whether we got a value
+                        if (match.Success) // Got a match OK
+                        {
+                            // Extract the device type as a string
+                            string deviceTypeString = match.Groups["DeviceTypeString"].Value;
+
+                            // Convert the string device type to a DeviceTypes enum value
                             DeviceTypes deviceType = deviceTypeString.ToDeviceType();
 
-                            logger.LogMessage("Replaytransactions", $"Extracted device type: {deviceTypeString} {deviceType}");
+                            Logger.LogDebug("ReplayTransactions", $"Extracted device type: {deviceTypeString} {deviceType}");
                         }
-
+                        else // Could not extract the device type from the URI
+                        {
+                            Logger.LogError("ReplayTransactions", $"Cannot extract the device type from the URI: {firstRequestUri}.");
+                            await DialogService.Alert($"Cannot extract the device type from the URI: {firstRequestUri}.", "Unable to Replay", null);
+                            return;
+                        }
+                    }
+                    else // Cannot find a string value for RequestUri in the first array element
+                    {
+                        Logger.LogError("ReplayTransactions", $"Cannot find the value of RequestUri in the first array element in the JSON file.");
+                        await DialogService.Alert($"Cannot find the value of RequestUri in the first array element in the JSON file.", "Unable to Replay", null);
+                        return;
                     }
                 }
-
+                else // No array elements in the JSON file
+                {
+                    Logger.LogError("ReplayTransactions", $"The selected file has no entries to replay: {selectedFile}");
+                    await DialogService.Alert($"The selected file has no entries to replay.", "Unable to Replay", null);
+                    return;
+                }
             }
-            logger.LogMessage("Replaytransactions", $"Completed initial parse");
+
+            Logger.LogDebug("ReplayTransactions", $"Completed initial parse");
 
             using (FileStream? fs = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
@@ -583,18 +617,41 @@
                 }
             }
 
-            state.ReplayTransactions = items;
+            State.ReplayTransactions = items;
             replayProgress = 100.0;
             await InvokeAsync(StateHasChanged);
             Navigation.NavigateTo("/");
-            logger.LogMessage("Replaytransactions", $"Replaying {items.Count} transactions from: {selectedFile}");
+            Logger.LogMessage("ReplayTransactions", $"Replaying {items.Count} transactions from: {selectedFile} Target device type: {State.ReplayTargetDevice?.DeviceType}");
 
-
-
+            HttpClient client = HttpClientFactory.CreateClient();
+            foreach (AlpacaTransaction transaction in items)
+            {
+                string targetURI = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice.PortNumber}{transaction.RequestUri}";
+                Logger.LogMessage("ReplayTransactions", $"Calling: {targetURI}, Received: {transaction.Response?.RootElement.GetRawText()}");
+                HttpRequestMessage request = new HttpRequestMessage(new HttpMethod(transaction.RequestMethod), targetURI);
+                if(transaction.RequestBody != "")
+                {
+                    request.Content = new StringContent(transaction.RequestBody, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
+                }
+                await client.SendAsync(request).ContinueWith(async responseTask =>
+                {
+                    try
+                    {
+                        var response = await responseTask;
+                        Logger.LogMessage("ReplayTransactions", $"Response for {transaction.RequestUri}: {response.StatusCode} {await response.Content.ReadAsStringAsync()}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError("ReplayTransactions", $"Error sending request for {transaction.RequestUri}: {ex.Message}\r\n{ex}");
+                        await DialogService.Alert($"Error while sending request or processing response, see Home page for details: {ex.Message}", "Unable to Replay", null);
+                    }
+                });
+            }
         }
         catch (Exception ex)
         {
-            logger.LogError("Replaytransactions", $"Error replaying file '{selectedFile}': {ex.Message}");
+            Logger.LogError("ReplayTransactions", $"Error replaying file '{selectedFile}': {ex.Message}");
+            await DialogService.Alert($"Error while replaying, see Home page for details: {ex.Message}", "Unable to Replay", null);
         }
     }
 
