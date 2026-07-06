@@ -621,26 +621,57 @@
             replayProgress = 100.0;
             await InvokeAsync(StateHasChanged);
 
-            // Navigate the the home page to show the logging screen
+            // Navigate to the home page to show the logging screen
             Navigation.NavigateTo("/");
 
-            // Notify what we are doikng
+            // Notify what we are doing
             Logger.LogMessage("ReplayTransactions", $"Replaying {items.Count} transactions from: {selectedFile} Target device type: {State.ReplayTargetDevice?.DeviceType}");
 
             // Create an HTTP client to send commands to the selected device
             HttpClient client = HttpClientFactory.CreateClient();
 
+
+            Regex methodRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/\d+\/(?<Method>[^\/\?]+)", RegexOptions.IgnoreCase);
+
+            // Set the time of the last command
+            DateTime lastCommandTime = DateTime.MinValue;
+
             // Send each recorded item to the selected device in turn and log the outcome
             foreach (AlpacaTransaction transaction in items)
             {
+                // Add a delay to simulate the time the client waited before sending initiating this transaction
+                if ((lastCommandTime != DateTime.MinValue)) // This is not the first transaction
+                {
+                    // Calculate the required delay which is the time between this and the last transaction minus the time taken by the device to respond
+                    TimeSpan delay = (transaction.RequestTimeSent - lastCommandTime).Subtract(transaction.ResponseTime);
+                    Logger.LogDebug("ReplayTransactions", $"Calculated delay: {delay.Milliseconds} milliseconds");
+                    await Task.Delay(delay.Milliseconds);
+                    Logger.LogDebug("ReplayTransactions", $"Delay complete");
+                }
+                else // This is the first transaction so no delay required
+                {
+                    // Save the last command time
+                    lastCommandTime = transaction.RequestTimeSent;
+                }
+                // Get the method being called
+                var match = methodRegex.Match(transaction.RequestUri ?? string.Empty);
+
+                string methodName = "UnknownMethod";
+                // Check whether we got a value
+                if (match.Success) // Got a match OK
+                {
+                    // Extract the device type as a string
+                    methodName = match.Groups["Method"].Value;
+                }
+
                 // Create the target URI based on the targe device's IP address, port and Alpaca device number
                 string targetURI = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}{transaction.RequestUri}";
-                Logger.LogMessage("ReplayTransactions", $"Calling: {targetURI}, Original response: {transaction.Response?.RootElement.GetRawText()}");
+                Logger.LogMessage("ReplayTransactions", $"Calling: {transaction.RequestMethod} {Capitalise(methodName)} - {targetURI}");
 
                 // Construct an HTTP request for the target device
                 HttpRequestMessage request = new HttpRequestMessage(new HttpMethod(transaction.RequestMethod), targetURI);
 
-                // If the original transaction contained a request body, add it to this request 
+                // If the original transaction contained a request body, add it to this request
                 if (transaction.RequestBody != "") // There is a request body so add it
                 {
                     request.Content = new StringContent(transaction.RequestBody, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
@@ -652,7 +683,20 @@
                     try
                     {
                         var response = await responseTask;
-                        Logger.LogMessage("ReplayTransactions", $"Response for {transaction.RequestUri}: {response.StatusCode} {await response.Content.ReadAsStringAsync()}");
+                        string responseString = await response.Content.ReadAsStringAsync();
+                        string formattedString = responseString;
+                        try
+                        {
+                            formattedString = JsonSerializer.Serialize(JsonSerializer.Deserialize<object>(responseString), new JsonSerializerOptions { WriteIndented = true });
+                        }
+                        catch (Exception)
+                        {
+                            // Do nothing, formattedString retains its original value: responseString
+                        }
+
+                        Logger.LogMessage("ReplayTransactions", $"Response: {response.StatusCode} {formattedString}");
+                        Logger.LogMessage("ReplayTransactions", $"Original: {transaction.Response?.RootElement.GetRawText()}");
+                        Logger.LogBlankLine();
                     }
                     catch (Exception ex)
                     {
@@ -667,6 +711,14 @@
             Logger.LogError("ReplayTransactions", $"Error replaying file '{selectedFile}': {ex.Message}");
             await DialogService.Alert($"Error while replaying, see Home page for details: {ex.Message}", "Unable to Replay", null);
         }
+    }
+
+    string Capitalise(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        return char.ToUpper(input[0]) + input.Substring(1);
     }
 
     RenderFragment RenderDirectory(string path) => builder =>

@@ -116,6 +116,13 @@ namespace AlpacaSpy
         public new void BlankLine() => LogBlankLine();
         public void LogWarning(string message) => LogWarning(string.Empty, message);
         public void LogError(string message) => LogError(string.Empty, message);
+        public void ClearScreen()
+        {
+            lock(Globals.writeLogLock)
+            {
+                state.ApplicationLog.Clear();
+            }
+        }
 
         private void OnMessageLogChanged(string message)
         {

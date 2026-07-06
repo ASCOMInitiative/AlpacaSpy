@@ -9,7 +9,15 @@
 <PageTitle>@Globals.APPLICATION_NAME</PageTitle>
 
 <div>
-    @settings.Status
+    <span>
+        <RadzenButton Click="ClearScreen"
+                      Text="Clear screen"
+                      ButtonStyle="ButtonStyle.Primary"
+                      Style="border-radius:20px; text-transform:none;"/>
+    </span>
+    <span>
+        @settings.Status
+    </span>
     <p />
 </div>
 
@@ -29,6 +37,14 @@
     private string _cachedLogText = string.Empty;
     private readonly CancellationTokenSource _cts = new();
     private DotNetObjectReference<Index>? objRef;
+
+    private async Task ClearScreen()
+    {
+        logger.ClearScreen();
+        _cachedLogText = "";
+        _lastLogLength = 0;
+        await InvokeAsync(StateHasChanged);
+    }
 
     protected override void OnInitialized()
     {
