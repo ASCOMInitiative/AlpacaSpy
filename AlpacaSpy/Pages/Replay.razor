@@ -156,7 +156,7 @@
 
 <div class="file-browser">
 
-    <!-- Breadcrumb + Up button -->
+    <!-- Breadcrumb + Buttons -->
     <div class="breadcrumb-bar">
         <RadzenButton Text="⬆ Up one level"
                       Click="@GoUpOneLevel"
@@ -517,7 +517,7 @@
         try
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var items = new List<AlpacaTransaction>();
+            var transactions = new List<AlpacaTransaction>();
             var total = 0;
 
             // Determine the device type of the recorded file by opening it as a JSON document and extracting the device type from first URL entry
@@ -600,7 +600,7 @@
                     }
 
                     // SAve each transaction as it is de-serialised
-                    items.Add(alpacaTransaction);
+                    transactions.Add(alpacaTransaction);
 
                     // Increment the progress counter and calculate progress percent
                     processed++;
@@ -615,7 +615,7 @@
             }
 
             // SAve the extracted transactions to current state
-            State.ReplayTransactions = items;
+            State.ReplayTransactions = transactions;
 
             // Force the progress bar to 100%
             replayProgress = 100.0;
@@ -625,7 +625,7 @@
             Navigation.NavigateTo("/");
 
             // Notify what we are doing
-            Logger.LogMessage("ReplayTransactions", $"Replaying {items.Count} transactions from: {selectedFile} Target device type: {State.ReplayTargetDevice?.DeviceType}");
+            Logger.LogMessage("ReplayTransactions", $"Replaying {transactions.Count} transactions from: {selectedFile} Target device type: {State.ReplayTargetDevice?.DeviceType}");
 
             // Create an HTTP client to send commands to the selected device
             HttpClient client = HttpClientFactory.CreateClient();
@@ -633,31 +633,34 @@
 
             Regex methodRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/\d+\/(?<Method>[^\/\?]+)", RegexOptions.IgnoreCase);
 
-            // Set the time of the last command
-            DateTime lastCommandTime = DateTime.MinValue;
+            // Set time counters for the original file and the current playback
+            TimeSpan timeSinceRecodingStart = TimeSpan.FromSeconds(0.0);
+            TimeSpan timeSincePlaybackStart = TimeSpan.FromSeconds(0.0);
+
+            // Initialise start times for the recoding and playback
+            DateTime startOfRecording = transactions.Count > 0 ? transactions[0].RequestTimeSent : DateTime.MinValue;  // Initialise the time at which the original recording started from the first transaction if it exists
+            DateTime startOfPlayback = DateTime.Now; // Initialise the time at which playback started
 
             // Send each recorded item to the selected device in turn and log the outcome
-            foreach (AlpacaTransaction transaction in items)
+            foreach (AlpacaTransaction transaction in transactions)
             {
-                // Add a delay to simulate the time the client waited before sending initiating this transaction
-                if ((lastCommandTime != DateTime.MinValue)) // This is not the first transaction
-                {
-                    // Calculate the required delay which is the time between this and the last transaction minus the time taken by the device to respond
-                    TimeSpan delay = (transaction.RequestTimeSent - lastCommandTime).Subtract(transaction.ResponseTime);
-                    Logger.LogDebug("ReplayTransactions", $"Calculated delay: {delay.Milliseconds} milliseconds");
-                    await Task.Delay(delay.Milliseconds);
-                    Logger.LogDebug("ReplayTransactions", $"Delay complete");
-                }
-                else // This is the first transaction so no delay required
-                {
-                    // Save the last command time
-                    lastCommandTime = transaction.RequestTimeSent;
-                }
-                // Get the method being called
-                var match = methodRegex.Match(transaction.RequestUri ?? string.Empty);
+                timeSinceRecodingStart = transaction.RequestTimeSent - startOfRecording;
+                timeSincePlaybackStart = DateTime.Now - startOfPlayback;
 
-                string methodName = "UnknownMethod";
+                // Calculate the required delay which is the time between this and the last transaction minus the time that the original device took to respond
+                TimeSpan delay = timeSinceRecodingStart - timeSincePlaybackStart;
+
+                // Apply the delay if it is positive
+                int delayMs = (int)delay.TotalMilliseconds;
+                await Task.Delay(delayMs >= 0 ? delayMs : 0);
+                Logger.LogDebug("ReplayTransactions", $"Txn time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Calculated delay: {delay.Milliseconds} milliseconds. Time since recording start: {timeSinceRecodingStart.TotalSeconds:0.000}," +
+                    $" Time since playback start: {timeSincePlaybackStart.TotalSeconds:0.000}");
+
+                // Get the method being called
+                Match match = methodRegex.Match(transaction.RequestUri ?? string.Empty);
+
                 // Check whether we got a value
+                string methodName = "UnknownMethod";
                 if (match.Success) // Got a match OK
                 {
                     // Extract the device type as a string
@@ -687,15 +690,20 @@
                         string formattedString = responseString;
                         try
                         {
-                            formattedString = JsonSerializer.Serialize(JsonSerializer.Deserialize<object>(responseString), new JsonSerializerOptions { WriteIndented = true });
+                            formattedString = JsonSerializer.Serialize(JsonSerializer.Deserialize<object>(responseString), new JsonSerializerOptions
+                            {
+                                WriteIndented = true,
+                                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                            });
                         }
                         catch (Exception)
                         {
-                            // Do nothing, formattedString retains its original value: responseString
+                            //Do nothing, formattedString retains its original value: responseString
                         }
 
                         Logger.LogMessage("ReplayTransactions", $"Response: {response.StatusCode} {formattedString}");
                         Logger.LogMessage("ReplayTransactions", $"Original: {transaction.Response?.RootElement.GetRawText()}");
+
                         Logger.LogBlankLine();
                     }
                     catch (Exception ex)

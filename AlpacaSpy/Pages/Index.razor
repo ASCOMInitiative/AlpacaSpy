@@ -41,7 +41,7 @@
     private async Task ClearScreen()
     {
         logger.ClearScreen();
-        _cachedLogText = "";
+        _cachedLogText = string.Empty;
         _lastLogLength = 0;
         await InvokeAsync(StateHasChanged);
     }
