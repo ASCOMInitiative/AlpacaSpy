@@ -123,7 +123,7 @@
         }
 </style>
 
-<PageTitle>@Globals.APPLICATION_NAME - Rep;lay Recordings</PageTitle>
+<PageTitle>@Globals.APPLICATION_NAME - Replay Recordings</PageTitle>
 
 <h3>Replay Recordings</h3>
 
@@ -560,9 +560,16 @@
                             string deviceTypeString = match.Groups["DeviceTypeString"].Value;
 
                             // Convert the string device type to a DeviceTypes enum value
-                            DeviceTypes deviceType = deviceTypeString.ToDeviceType();
+                            AlpacaDeviceType deviceType = Enum.Parse<AlpacaDeviceType>(deviceTypeString, true);
 
                             Logger.LogDebug("ReplayTransactions", $"Extracted device type: {deviceTypeString} {deviceType}");
+
+                            if (deviceType != State.ReplayTargetDevice?.DeviceType)
+                            {
+                                Logger.LogError("ReplayTransactions", $"The device type of the replay file ({deviceType}) does not match the target device type ({State.ReplayTargetDevice?.DeviceType}).");
+                                await DialogService.Alert($"The device type of the replay file ({deviceType}) does not match the target device type ({State.ReplayTargetDevice?.DeviceType}).", "Unable to Replay", null);
+                                return;
+                            }
                         }
                         else // Could not extract the device type from the URI
                         {
@@ -649,6 +656,8 @@
 
                 // Calculate the required delay which is the time between this and the last transaction minus the time that the original device took to respond
                 TimeSpan delay = timeSinceRecodingStart - timeSincePlaybackStart;
+                Logger.LogDebug("ReplayTransactions", $"Current recording time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Recording start: {startOfRecording:HH:mm:ss.fff}, " +
+                    $"Current playback time: {DateTime.Now:HH:mm:ss.fff}, Playback start: {startOfPlayback:HH:mm:ss.fff}");
 
                 // Apply the delay if it is positive
                 int delayMs = (int)delay.TotalMilliseconds;
@@ -674,10 +683,43 @@
                 // Construct an HTTP request for the target device
                 HttpRequestMessage request = new HttpRequestMessage(new HttpMethod(transaction.RequestMethod), targetURI);
 
-                // If the original transaction contained a request body, add it to this request
-                if (transaction.RequestBody != "") // There is a request body so add it
+                // If the transaction contains a request body, add it and this transaction's content headers to the request
+                if (transaction.RequestBody != "") // The transaction does have a request body
                 {
-                    request.Content = new StringContent(transaction.RequestBody, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
+                    // Create a string content item based on the transaction's content
+                    Logger.LogDebug("ReplayTransactions", $"Request body is not empty string: {transaction.RequestBody}.");
+                    StringContent newContent = new StringContent(transaction.RequestBody, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
+
+                    // Check whether there is an existing content item (satisfied nullability requirements)
+                    if (request.Content is not null) // There is a request body so add it's headers to the original request
+                    {
+                        // Iterate over the headers and add them to the new content
+                        foreach (KeyValuePair<string, IEnumerable<string>> header in request.Content.Headers)
+                        {
+                            // Copy header values to the new content (TryAddWithoutValidation is used to avoid validation issues)
+                            newContent.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                            Logger.LogDebug("ReplayTransactions", $"Added header: {header.Key} = {header.Value}.");
+                        }
+                    }
+
+                    // Add the revised content to the request
+                    request.Content = newContent;
+                    Logger.LogDebug("ReplayTransactions", $"Added content: {transaction.RequestBody}.");
+                }
+
+                // Add any recorded request headers (as opposed to content headers) to the outgoing HttpRequestMessage.
+                if (transaction.RequestHeaders != null)
+                {
+                    // Try to add each request header to request.Headers .
+                    foreach (KeyValuePair<string, string[]> kvp in transaction.RequestHeaders)
+                    {
+                        var headerName = kvp.Key;
+                        var headerValues = kvp.Value ?? Array.Empty<string>();
+
+                        // Try general headers first
+                        if (request.Headers.TryAddWithoutValidation(headerName, headerValues)) // Added header OK
+                            Logger.LogDebug("ReplayTransactions", $"Added {kvp.Key} request header successfully.");
+                    }
                 }
 
                 // Send the request to the target device and wait for a response
@@ -711,12 +753,20 @@
                         Logger.LogError("ReplayTransactions", $"Error sending request for {transaction.RequestUri}: {ex.Message}\r\n{ex}");
                         await DialogService.Alert($"Error while sending request or processing response, see Home page for details: {ex.Message}", "Unable to Replay", null);
                     }
+
                 });
+
+                // Exit if cancellation is requested
+                if (State.CancellationToken.IsCancellationRequested)
+                {
+                    Logger.LogError("ReplayTransactions", $"Replay cancelled.");
+                    break;
+                }
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError("ReplayTransactions", $"Error replaying file '{selectedFile}': {ex.Message}");
+            Logger.LogError("ReplayTransactions", $"Error replaying file '{selectedFile}': {ex.Message}\r\n{ex}");
             await DialogService.Alert($"Error while replaying, see Home page for details: {ex.Message}", "Unable to Replay", null);
         }
     }
@@ -799,7 +849,8 @@
         SelectedPath = path;
         BuildBreadcrumb(path);
 
-        Files = new List<System.IO.FileInfo>();
+        Files = new List<System.IO.FileInfo>
+        ();
         foreach (var f in Browser.GetFiles(path))
         {
             if (f != null && f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))

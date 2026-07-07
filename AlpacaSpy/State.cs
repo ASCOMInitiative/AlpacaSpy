@@ -18,6 +18,8 @@ namespace AlpacaSpy
             InstanceId = RandomHex10Secure();
         }
 
+        public CancellationToken CancellationToken = CancellationToken.None;
+
         public string InstanceId { get; set; }
 
         public string ApplicationVersion { get; set; } = "Not set";

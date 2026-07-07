@@ -16,6 +16,12 @@
                       Style="border-radius:20px; text-transform:none;"/>
     </span>
     <span>
+        <RadzenButton Click="OnCancelButtonPressed"
+                      Text="Cancel Playback"
+                      ButtonStyle="ButtonStyle.Danger"
+                      Style="border-radius:20px; text-transform:none;" />
+    </span>
+    <span>
         @settings.Status
     </span>
     <p />
@@ -31,6 +37,8 @@
 
 @code
 {
+    CancellationTokenSource cancelAlpacaSpy = new CancellationTokenSource();
+
     private bool _disposed;
     private bool _logContentChanged;
     private int _lastLogLength;
@@ -38,6 +46,11 @@
     private readonly CancellationTokenSource _cts = new();
     private DotNetObjectReference<Index>? objRef;
 
+    private async Task OnCancelButtonPressed()
+    {
+        cancelAlpacaSpy.Cancel();
+    }
+    
     private async Task ClearScreen()
     {
         logger.ClearScreen();
@@ -48,6 +61,7 @@
 
     protected override void OnInitialized()
     {
+        state.CancellationToken = cancelAlpacaSpy.Token;
         state.StateChanged += OnStateChanged;
         settings.ConfigurationChanged += OnStateChanged;
 
