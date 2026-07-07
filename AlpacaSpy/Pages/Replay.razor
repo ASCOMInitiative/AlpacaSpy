@@ -654,16 +654,13 @@
                 timeSinceRecodingStart = transaction.RequestTimeSent - startOfRecording;
                 timeSincePlaybackStart = DateTime.Now - startOfPlayback;
 
-                // Calculate the required delay which is the time between this and the last transaction minus the time that the original device took to respond
-                TimeSpan delay = timeSinceRecodingStart - timeSincePlaybackStart;
-                Logger.LogDebug("ReplayTransactions", $"Current recording time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Recording start: {startOfRecording:HH:mm:ss.fff}, " +
-                    $"Current playback time: {DateTime.Now:HH:mm:ss.fff}, Playback start: {startOfPlayback:HH:mm:ss.fff}");
+                // Calculate the required delay in integer milliseconds, which is the time between this and the last transaction 
+                int delayMs = (int)timeSinceRecodingStart.Subtract(timeSincePlaybackStart).TotalMilliseconds;
+                Logger.LogDebug("ReplayTransactions", $"Txn time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Calculated delay: {delayMs:0.0} milliseconds. Time since recording start: {timeSinceRecodingStart.TotalSeconds:0.000}," +
+                    $" Time since playback start: {timeSincePlaybackStart.TotalSeconds:0.000}");
 
                 // Apply the delay if it is positive
-                int delayMs = (int)delay.TotalMilliseconds;
                 await Task.Delay(delayMs >= 0 ? delayMs : 0);
-                Logger.LogDebug("ReplayTransactions", $"Txn time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Calculated delay: {delay.Milliseconds} milliseconds. Time since recording start: {timeSinceRecodingStart.TotalSeconds:0.000}," +
-                    $" Time since playback start: {timeSincePlaybackStart.TotalSeconds:0.000}");
 
                 // Get the method being called
                 Match match = methodRegex.Match(transaction.RequestUri ?? string.Empty);
