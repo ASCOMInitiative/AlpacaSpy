@@ -1,6 +1,5 @@
 ﻿@page "/filebrowser"
 @using ASCOM.Tools
-@using ASCOM.Common
 @using System.Text.Json
 @using System.Text.RegularExpressions
 @inject FileBrowserService Browser
@@ -518,7 +517,7 @@
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var transactions = new List<AlpacaTransaction>();
-            var total = 0;
+            var totalTransactions = 0;
 
             // Determine the device type of the recorded file by opening it as a JSON document and extracting the device type from first URL entry
             Logger.LogMessage("ReplayTransactions", $"Starting initial parse");
@@ -534,11 +533,11 @@
                 }
 
                 // Get the overall number of entries so we can show the % progress
-                total = jsonDocument.RootElement.GetArrayLength();
+                totalTransactions = jsonDocument.RootElement.GetArrayLength();
 
                 // Extract the string value of the "RequestUri" property from the first element of the top-level array, if present.
                 string? firstRequestUri = null;
-                if (total > 0) // At least one array element in the JSOn file
+                if (totalTransactions > 0) // At least one array element in the JSOn file
                 {
                     // Get the first element in the array
                     JsonElement firstElement = jsonDocument.RootElement[0];
@@ -613,9 +612,9 @@
                     processed++;
 
                     // Update the progress UI every 100 transactions read
-                    if (processed % 100 == 0 || processed == total)
+                    if (processed % 100 == 0 || processed == totalTransactions)
                     {
-                        replayProgress = 100.0 * processed / total;
+                        replayProgress = 100.0 * processed / totalTransactions;
                         await InvokeAsync(StateHasChanged);
                     }
                 }
@@ -654,7 +653,7 @@
                 timeSinceRecodingStart = transaction.RequestTimeSent - startOfRecording;
                 timeSincePlaybackStart = DateTime.Now - startOfPlayback;
 
-                // Calculate the required delay in integer milliseconds, which is the time between this and the last transaction 
+                // Calculate the required delay in integer milliseconds, which is the time between this and the last transaction
                 int delayMs = (int)timeSinceRecodingStart.Subtract(timeSincePlaybackStart).TotalMilliseconds;
                 Logger.LogDebug("ReplayTransactions", $"Txn time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Calculated delay: {delayMs:0.0} milliseconds. Time since recording start: {timeSinceRecodingStart.TotalSeconds:0.000}," +
                     $" Time since playback start: {timeSincePlaybackStart.TotalSeconds:0.000}");
@@ -729,11 +728,11 @@
                         string formattedString = responseString;
                         try
                         {
-                            formattedString = JsonSerializer.Serialize(JsonSerializer.Deserialize<object>(responseString), new JsonSerializerOptions
-                            {
-                                WriteIndented = true,
-                                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                            });
+                            // formattedString = JsonSerializer.Serialize(JsonSerializer.Deserialize<object>(responseString), new JsonSerializerOptions
+                            // {
+                            //     WriteIndented = true,
+                            //     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                            // });
                         }
                         catch (Exception)
                         {
@@ -741,7 +740,8 @@
                         }
 
                         Logger.LogMessage("ReplayTransactions", $"Response: {response.StatusCode} {formattedString}");
-                        Logger.LogMessage("ReplayTransactions", $"Original: {transaction.Response?.RootElement.GetRawText()}");
+                        Logger.LogMessage("ReplayTransactions", $"Original: {((System.Net.HttpStatusCode)transaction.ResponseStatusCode)} {JsonSerializer.Serialize(transaction.Response,
+                            new JsonSerializerOptions() { WriteIndented = false, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping })}");
 
                         Logger.LogBlankLine();
                     }
@@ -766,6 +766,43 @@
             Logger.LogError("ReplayTransactions", $"Error replaying file '{selectedFile}': {ex.Message}\r\n{ex}");
             await DialogService.Alert($"Error while replaying, see Home page for details: {ex.Message}", "Unable to Replay", null);
         }
+    }
+
+    string FormatJsonNameValuePairs(JsonDocument? document)
+    {
+        if (document is null)
+            return string.Empty;
+
+        return FormatJsonNameValuePairs(document.RootElement);
+    }
+
+    string FormatJsonNameValuePairs(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            List<string> parts = new();
+
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                parts.Add($"{property.Name}:{FormatJsonNameValuePairs(property.Value)}");
+            }
+
+            return string.Join(", ", parts);
+        }
+
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            List<string> parts = new();
+
+            foreach (JsonElement item in element.EnumerateArray())
+            {
+                parts.Add(FormatJsonNameValuePairs(item));
+            }
+
+            return string.Join(", ", parts);
+        }
+
+        return element.GetRawText();
     }
 
     string Capitalise(string input)
