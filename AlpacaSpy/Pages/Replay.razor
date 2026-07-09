@@ -8,6 +8,7 @@
 @inject State State
 @inject IHttpClientFactory HttpClientFactory
 @inject DialogService DialogService
+@inject Settings Settings
 
 <style>
     .title-row {
@@ -173,6 +174,11 @@
                       Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowAscomLogsClickHandler"
                       Style="margin-left:8px; border-radius:20px; text-transform:none;" />
+        <span style="margin-left:48px;min-width:205px;">
+            <RadzenCheckBox Value="Settings.PlaybackExpandJson"
+                            ValueChanged="@((bool v) => { Settings.PlaybackExpandJson = v;})" />
+            <label>Pretty-print JSON on playback.</label>
+        </span>
 
         <span class="breadcrumb" style="margin-top:12px;">
             @foreach (var part in BreadcrumbParts)
@@ -508,7 +514,7 @@
         // local variable containing the selected file name
         string? selectedFile = State.ReplaySelectedFileFullName;
 
-        // MAke sure the selected file really does exist
+        // Make sure the selected file really does exist
         if (string.IsNullOrEmpty(selectedFile) || !File.Exists(selectedFile))
         {
             Logger.LogError("ReplayTransactions", "No file selected or file does not exist.");
@@ -519,6 +525,7 @@
         replayProgress = 0.0;
         await InvokeAsync(StateHasChanged);
 
+        // Play back recording
         try
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -732,24 +739,44 @@
                         var response = await responseTask;
                         string responseString = await response.Content.ReadAsStringAsync();
                         string formattedString = responseString;
+
+                        // Pretty-print the device's current response
                         try
                         {
-                            // formattedString = JsonSerializer.Serialize(JsonSerializer.Deserialize<object>(responseString), new JsonSerializerOptions
-                            // {
-                            //     WriteIndented = true,
-                            //     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                            // });
+                            if (Settings.PlaybackExpandJson)
+                            {
+                                formattedString = JsonSerializer.Serialize(JsonSerializer.Deserialize<object>(responseString), new JsonSerializerOptions
+                                {
+                                    WriteIndented = true,
+                                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                                });
+                            }
                         }
                         catch (Exception)
                         {
                             // Do nothing, formattedString retains its original value: responseString
                         }
 
+                        // Log the device response
                         Logger.LogMessage("ReplayTransactions", $"◄── {response.StatusCode} {formattedString}");
-                        Logger.LogMessage("ReplayTransactions", $"    {((System.Net.HttpStatusCode)transaction.ResponseStatusCode)} {JsonSerializer.Serialize(transaction.Response,
-                            new JsonSerializerOptions() { WriteIndented = false, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping })} (Original device response)");
 
-                        Logger.LogBlankLine();
+                        try
+                        {
+                            // Pretty-print the original response
+                            formattedString = JsonSerializer.Serialize(transaction.Response, new JsonSerializerOptions()
+                            {
+                                WriteIndented = Settings.PlaybackExpandJson,
+                                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            formattedString = $"Pretty-print failure - could not display original response: {ex.Message}.";
+                        }
+
+                        // Log the original response
+                        Logger.LogMessage("ReplayTransactions", $"    {(System.Net.HttpStatusCode)transaction.ResponseStatusCode} {formattedString} (Original device response)\r\n\r\n");
+
                     }
                     catch (Exception ex)
                     {

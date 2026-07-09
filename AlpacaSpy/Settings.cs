@@ -169,6 +169,8 @@ namespace AlpacaSpy
         public bool SendDiscoveryResponsesOnAllNetworks { get; set; } = true;
         public bool RunInStrictAlpacaMode { get; set; } = true;
 
+        public bool PlaybackExpandJson { get; set; } = false;
+
         public int MaximumRecordingFileEntries { get; set; } = Globals.MAXIMUM_RECORDING_FILE_ENTRIES;
 
         public void ResetToDefaults()
