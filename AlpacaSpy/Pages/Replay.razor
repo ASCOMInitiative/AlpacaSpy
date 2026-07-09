@@ -636,8 +636,8 @@
             // Create an HTTP client to send commands to the selected device
             HttpClient client = HttpClientFactory.CreateClient();
 
-
-            Regex methodRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/\d+\/(?<Method>[^\/\?]+)", RegexOptions.IgnoreCase);
+            // Create a regex to extract the device type and method from the request URI. 
+            Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/\d+\/(?<Method>[^\/\?]+)", RegexOptions.IgnoreCase);
 
             // Set time counters for the original file and the current playback
             TimeSpan timeSinceRecodingStart = TimeSpan.FromSeconds(0.0);
@@ -662,7 +662,7 @@
                 await Task.Delay(delayMs >= 0 ? delayMs : 0);
 
                 // Get the method being called
-                Match match = methodRegex.Match(transaction.RequestUri ?? string.Empty);
+                Match match = uriRegex.Match(transaction.RequestUri ?? string.Empty);
 
                 // Check whether we got a value
                 string methodName = "UnknownMethod";
@@ -673,11 +673,11 @@
                 }
 
                 // Create the target URI based on the targe device's IP address, port and Alpaca device number
-                string targetURI = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}{transaction.RequestUri}";
-                Logger.LogMessage("ReplayTransactions", $"Calling: {transaction.RequestMethod} {Capitalise(methodName)} - {targetURI}");
+                string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}{transaction.RequestUri}";
+                Logger.LogMessage("ReplayTransactions", $"──► {transaction.RequestMethod} {Capitalise(methodName)} - {targetUri}");
 
                 // Construct an HTTP request for the target device
-                HttpRequestMessage request = new HttpRequestMessage(new HttpMethod(transaction.RequestMethod), targetURI);
+                HttpRequestMessage request = new HttpRequestMessage(new HttpMethod(transaction.RequestMethod), targetUri);
 
                 // If the transaction contains a request body, add it and this transaction's content headers to the request
                 if (transaction.RequestBody != "") // The transaction does have a request body
@@ -736,12 +736,12 @@
                         }
                         catch (Exception)
                         {
-                            //Do nothing, formattedString retains its original value: responseString
+                            // Do nothing, formattedString retains its original value: responseString
                         }
 
-                        Logger.LogMessage("ReplayTransactions", $"Response: {response.StatusCode} {formattedString}");
-                        Logger.LogMessage("ReplayTransactions", $"Original: {((System.Net.HttpStatusCode)transaction.ResponseStatusCode)} {JsonSerializer.Serialize(transaction.Response,
-                            new JsonSerializerOptions() { WriteIndented = false, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping })}");
+                        Logger.LogMessage("ReplayTransactions", $"◄── {response.StatusCode} {formattedString}");
+                        Logger.LogMessage("ReplayTransactions", $"    {((System.Net.HttpStatusCode)transaction.ResponseStatusCode)} {JsonSerializer.Serialize(transaction.Response,
+                            new JsonSerializerOptions() { WriteIndented = false, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping })} (Original device response)");
 
                         Logger.LogBlankLine();
                     }
