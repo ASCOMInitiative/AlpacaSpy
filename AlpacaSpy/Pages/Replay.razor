@@ -788,6 +788,20 @@
                                     bool originalExists = transaction.Response.RootElement.TryGetProperty(propertyName, out JsonElement originalElem);
                                     bool currentExists = currentDoc.RootElement.TryGetProperty(propertyName, out JsonElement currentElem);
 
+                                    // Local function to format JSON elements for logging, pretty-printing objects and arrays
+                                    string GetDisplayString(JsonElement element)
+                                    {
+                                        if (element.ValueKind == JsonValueKind.Object || element.ValueKind == JsonValueKind.Array)
+                                        {
+                                            return JsonSerializer.Serialize(element, new JsonSerializerOptions
+                                            {
+                                                WriteIndented = true,
+                                                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                                            });
+                                        }
+                                        return element.GetRawText();
+                                    }
+
                                     if (originalExists && currentExists) // Command returns a value
                                     {
                                         if (Regex.Replace(originalElem.GetRawText(), @"\s+", "") == Regex.Replace(currentElem.GetRawText(), @"\s+", ""))
@@ -798,12 +812,12 @@
                                         }
                                         else
                                         {
-                                            Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} ELEMENTS ARE DIFFERENT - Original: {originalElem.GetRawText()}, Replayed: {currentElem.GetRawText()}");
+                                            Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} ELEMENTS ARE DIFFERENT\r\nOriginal: {GetDisplayString(originalElem)}\r\nCurrent: {GetDisplayString(currentElem)}");
                                         }
                                     }
                                     else if (originalExists != currentExists) // One call returned a JSON Value element while the other did not...
                                     {
-                                        Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} IS MISSING IN ONE RESPONSE - Original: {originalElem.GetRawText()}, Replayed: {currentElem.GetRawText()}");
+                                        Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} IS MISSING IN ONE RESPONSE\r\nOriginal: {GetDisplayString(originalElem)}\r\nCurrent: {GetDisplayString(currentElem)}");
                                     }
                                     else //Method - Neither response had the required element
                                     {
@@ -813,7 +827,7 @@
                                         }
                                         else
                                         {
-                                            Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} IS MISSING IN BOTH RESPONSES - Original: {originalElem.GetRawText()}, Replayed: {currentElem.GetRawText()}");
+                                            Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} IS MISSING IN BOTH RESPONSES\r\nOriginal: {GetDisplayString(originalElem)}\r\nCurrent: {GetDisplayString(currentElem)}");
                                         }
                                     }
                                 }
