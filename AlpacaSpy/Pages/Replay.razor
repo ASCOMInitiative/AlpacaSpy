@@ -781,33 +781,48 @@
                             try
                             {
                                 using JsonDocument currentDoc = JsonDocument.Parse(responseString);
-                                if (transaction.Response.RootElement.TryGetProperty("Value", out JsonElement originalValue) && currentDoc.RootElement.TryGetProperty("Value", out JsonElement currentValue))
-                                {
-                                    string originalRaw = originalValue.GetRawText();
-                                    string currentRaw = currentValue.GetRawText();
+                                string[] propertiesToCompare = ["Value", "ErrorNumber", "ErrorMessage"];
 
-                                    // Ignore any whitespace differences between the values
-                                    if (Regex.Replace(originalRaw, @"\s+", "") == Regex.Replace(currentRaw, @"\s+", ""))
-                                    {
-                                        // Log the original response
-                                        // Logger.LogMessage("ReplayTransactions", $"    {(System.Net.HttpStatusCode)transaction.ResponseStatusCode} {formattedString} (Original device response)\r\n\r\n");
-                                        Logger.LogMessage("ReplayTransactions", "    Response matches recording.\r\n\r\n");
-                                    }
-                                    else
-                                    {
-                                        Logger.LogMessage("ReplayTransactions", $"    VALUE IS DIFFERENT - Original: {originalRaw}, Replayed: {currentRaw}\r\n\r\n");
-                                    }
-                                }
-                                else
+                                foreach (string propertyName in propertiesToCompare)
                                 {
-                                    // Log the original response
-                                    Logger.LogMessage("ReplayTransactions", $"    Method - no Value element.\r\n\r\n");
+                                    bool originalExists = transaction.Response.RootElement.TryGetProperty(propertyName, out JsonElement originalElem);
+                                    bool currentExists = currentDoc.RootElement.TryGetProperty(propertyName, out JsonElement currentElem);
+
+                                    if (originalExists && currentExists) // Command returns a value
+                                    {
+                                        if (Regex.Replace(originalElem.GetRawText(), @"\s+", "") == Regex.Replace(currentElem.GetRawText(), @"\s+", ""))
+                                        {
+                                            // Elements match
+                                            if (propertyName.ToUpperInvariant() == "VALUE")
+                                                Logger.LogMessage("ReplayTransactions", $"    {propertyName} elements match.");
+                                        }
+                                        else
+                                        {
+                                            Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} ELEMENTS ARE DIFFERENT - Original: {originalElem.GetRawText()}, Replayed: {currentElem.GetRawText()}");
+                                        }
+                                    }
+                                    else if (originalExists != currentExists) // One call returned a JSON Value element while the other did not...
+                                    {
+                                        Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} IS MISSING IN ONE RESPONSE - Original: {originalElem.GetRawText()}, Replayed: {currentElem.GetRawText()}");
+                                    }
+                                    else //Method - Neither response had the required element
+                                    {
+                                        if (propertyName.ToUpperInvariant() == "VALUE")
+                                        {
+                                            Logger.LogMessage("ReplayTransactions", "    Method - no Value element.");
+                                        }
+                                        else
+                                        {
+                                            Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} IS MISSING IN BOTH RESPONSES - Original: {originalElem.GetRawText()}, Replayed: {currentElem.GetRawText()}");
+                                        }
+                                    }
                                 }
+
+                                Logger.LogMessage("ReplayTransactions", "\r\n");
                             }
-                            catch (Exception)
+                            catch (Exception ex)
                             {
-                                Logger.LogBlankLine();
-                                Logger.LogBlankLine();
+                                Logger.LogError("ReplayTransactions", $"Error assessing response to transaction {transaction.RequestUri}: {ex.Message}\r\n{ex}");
                             }
                         }
 
