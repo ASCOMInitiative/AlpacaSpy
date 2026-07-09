@@ -159,19 +159,20 @@
     <div class="breadcrumb-bar">
         <RadzenButton Text="⬆ Up one level"
                       Click="@GoUpOneLevel"
+                      Style="border-radius:20px; text-transform:none;"
                       Disabled="@(string.IsNullOrEmpty(SelectedPath) || State.ReplayTargetDevice is null )" />
         <RadzenButton Text="Documents"
                       Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDocuments"
-                      Style="margin-left:8px" />
+                      Style="margin-left:8px; border-radius:20px; text-transform:none;" />
         <RadzenButton Text="Disks"
                       Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDisks"
-                      Style="margin-left:8px" />
+                      Style="margin-left:8px; border-radius:20px; text-transform:none;" />
         <RadzenButton Text="ASCOM Logs"
                       Disabled="@(State.ReplayTargetDevice is null )"
-                      Click="@ShowAscomLogs"
-                      Style="margin-left:8px" />
+                      Click="@ShowAscomLogsClickHandler"
+                      Style="margin-left:8px; border-radius:20px; text-transform:none;" />
 
         <span class="breadcrumb" style="margin-top:12px;">
             @foreach (var part in BreadcrumbParts)
@@ -250,13 +251,16 @@
                     @foreach (var file in Files)
                     {
                         <div class="file-item">
-                            <input type="radio" name="jsonFiles" checked="@(selectedFileFullName == file.FullName)" @onchange="@(e => OnFileRadioChanged(file.FullName, e))" />
+                            <input type="radio" name="jsonFiles" checked="@(State.ReplaySelectedFileFullName == file.FullName)" @onchange="@(e => OnFileRadioChanged(file.FullName, e))" />
                             <label>@file.Name</label>
                         </div>
                     }
                 </div>
                 <div style="margin-top:8px; text-align:right;">
-                    <RadzenButton Text="Replay Transactions" Click="@ReplayTransactions" Disabled="@(string.IsNullOrEmpty(selectedFileFullName))" />
+                    <RadzenButton Text="Replay Transactions"
+                                  Click="@ReplayTransactions"
+                                  Style="margin-left:8px; border-radius:20px; text-transform:none;"
+                                  Disabled="@(string.IsNullOrEmpty(State.ReplaySelectedFileFullName))" />
                     <div style="margin-top:8px;">
                         <RadzenProgressBar @bind-Value="@replayProgress" AriaLabel="Replay Progress" Style="width:240px;" />
                     </div>
@@ -309,15 +313,12 @@
     bool baseIsDisks = true;
     string? baseRootPath = null;
 
-    // currently selected file for replay (full path); null = none selected
-    string? selectedFileFullName = null;
-
     double replayProgress = 0.0;
 
     protected override void OnInitialized()
     {
         // default to ASCOM Logs view if available
-        ShowAscomLogs();
+        ShowAscomLogs(false);
     }
 
     /// <summary>
@@ -371,7 +372,7 @@
             baseRootPath = docs;
             dirCache.Clear();
             expanded.Clear();
-            selectedFileFullName = null;
+            State.ReplaySelectedFileFullName = null;
 
             // Show the Documents folder itself as the root (do not auto-select a child)
             NavigateTo(docs);
@@ -390,7 +391,7 @@
         baseRootPath = null;
         dirCache.Clear();
         expanded.Clear();
-        selectedFileFullName = null;
+        State.ReplaySelectedFileFullName = null;
 
         // Select the first drive if present
         var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
@@ -400,11 +401,16 @@
         }
     }
 
+    void ShowAscomLogsClickHandler()
+    {
+        ShowAscomLogs(true);
+    }
+
     /// <summary>
     /// Switch the tree to the ASCOM logs directory (via TraceLogger) and select the first visible child.
     /// Falls back to the Disks view if the ASCOM log path is unavailable.
     /// </summary>
-    void ShowAscomLogs()
+    void ShowAscomLogs(bool clearSelectedFile)
     {
         try
         {
@@ -418,8 +424,11 @@
             baseRootPath = dir;
             dirCache.Clear();
             expanded.Clear();
-            selectedFileFullName = null;
+            if (clearSelectedFile)
+            {
+                State.ReplaySelectedFileFullName = null;
 
+            }
             // Select the first child under ASCOM logs, or the directory itself if no children
             if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
             {
@@ -441,7 +450,7 @@
             baseRootPath = null;
             dirCache.Clear();
             expanded.Clear();
-            selectedFileFullName = null;
+            State.ReplaySelectedFileFullName = null;
 
             var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
             if (firstDrive != null && Directory.Exists(firstDrive.Name))
@@ -469,9 +478,6 @@
                     Files.Add(new System.IO.FileInfo(f));
                 }
             }
-
-            // clear any previous selection when loading a new folder so radios start unselected
-            selectedFileFullName = null;
         }
     }
 
@@ -483,12 +489,12 @@
         // Radio change value can be string or bool; treat any change as selection of this radio button.
         if (e?.Value is bool b && b == false)
         {
-            // some browsers/components may allow unchecking; treat as no selection
-            selectedFileFullName = null;
+            // some browsers/components may allow un-checking; treat as no selection
+            State.ReplaySelectedFileFullName = null;
         }
         else
         {
-            selectedFileFullName = fullName;
+            State.ReplaySelectedFileFullName = fullName;
         }
     }
 
@@ -500,7 +506,7 @@
     async Task ReplayTransactions()
     {
         // local variable containing the selected file name
-        string? selectedFile = selectedFileFullName;
+        string? selectedFile = State.ReplaySelectedFileFullName;
 
         // MAke sure the selected file really does exist
         if (string.IsNullOrEmpty(selectedFile) || !File.Exists(selectedFile))
@@ -636,7 +642,7 @@
             // Create an HTTP client to send commands to the selected device
             HttpClient client = HttpClientFactory.CreateClient();
 
-            // Create a regex to extract the device type and method from the request URI. 
+            // Create a regex to extract the device type and method from the request URI.
             Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/\d+\/(?<Method>[^\/\?]+)", RegexOptions.IgnoreCase);
 
             // Set time counters for the original file and the current playback
@@ -918,7 +924,7 @@
         catch { }
 
         // clear any previous selection when navigating so radios are initially unselected
-        selectedFileFullName = null;
+        State.ReplaySelectedFileFullName = null;
 
         // request UI update
         InvokeAsync(StateHasChanged);
