@@ -774,8 +774,42 @@
                             formattedString = $"Pretty-print failure - could not display original response: {ex.Message}.";
                         }
 
-                        // Log the original response
-                        Logger.LogMessage("ReplayTransactions", $"    {(System.Net.HttpStatusCode)transaction.ResponseStatusCode} {formattedString} (Original device response)\r\n\r\n");
+
+                        // Compare "Value" property if present in both responses when the status is 200 OK
+                        if (response.StatusCode == System.Net.HttpStatusCode.OK && transaction.Response != null)
+                        {
+                            try
+                            {
+                                using JsonDocument currentDoc = JsonDocument.Parse(responseString);
+                                if (transaction.Response.RootElement.TryGetProperty("Value", out JsonElement originalValue) && currentDoc.RootElement.TryGetProperty("Value", out JsonElement currentValue))
+                                {
+                                    string originalRaw = originalValue.GetRawText();
+                                    string currentRaw = currentValue.GetRawText();
+
+                                    // Ignore any whitespace differences between the values
+                                    if (Regex.Replace(originalRaw, @"\s+", "") == Regex.Replace(currentRaw, @"\s+", ""))
+                                    {
+                                        // Log the original response
+                                        // Logger.LogMessage("ReplayTransactions", $"    {(System.Net.HttpStatusCode)transaction.ResponseStatusCode} {formattedString} (Original device response)\r\n\r\n");
+                                        Logger.LogMessage("ReplayTransactions", "    Response matches recording.\r\n\r\n");
+                                    }
+                                    else
+                                    {
+                                        Logger.LogMessage("ReplayTransactions", $"    VALUE IS DIFFERENT - Original: {originalRaw}, Replayed: {currentRaw}\r\n\r\n");
+                                    }
+                                }
+                                else
+                                {
+                                    // Log the original response
+                                    Logger.LogMessage("ReplayTransactions", $"    Method - no Value element.\r\n\r\n");
+                                }
+                            }
+                            catch (Exception)
+                            {
+                                Logger.LogBlankLine();
+                                Logger.LogBlankLine();
+                            }
+                        }
 
                     }
                     catch (Exception ex)
