@@ -50,7 +50,6 @@ namespace AlpacaSpy
 
         public async Task InvokeAsync(HttpContext context)
         {
-            logger.LogMessage("InvokeAsync", $"Entered");
             string path = context.Request.Path.Value ?? string.Empty;
             Match match = DeviceApiPattern.Match(path);
             // Only process paths that match the Alpaca API protocol, other paths are passed to the rest of the pipeline for processing

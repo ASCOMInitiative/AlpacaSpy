@@ -509,13 +509,14 @@
         }
     }
 
-    private record MismatchRecord(string sendLogMessage, string responseLogMessage, string originalJsonString, string currentJsonString, string mismatchMessage)
+    private record MismatchRecord(DateTime mismatchTime, string sendLogMessage, string responseLogMessage, string originalJsonString, string currentJsonString, string mismatchMessage)
     {
+        DateTime MismatchTime { get; set; } = mismatchTime;
         string SendLogMessage { get; set; } = sendLogMessage;
         string ResponseLogMessage { get; set; } = responseLogMessage;
         string OriginalJsonString { get; set; } = originalJsonString;
         string CurrentJsonString { get; set; } = currentJsonString;
-        string ErrorMessage { get; set; } = mismatchMessage;
+        string MismatchMessage { get; set; } = mismatchMessage;
     }
 
     /// <summary>
@@ -709,6 +710,11 @@
 
                 // Create the outgoing log message and save it for use if the device responds differently to the recorded outcome
                 sendLogMessage = $"──► {transaction.RequestMethod} {CapitaliseMemberName(methodName)} - {targetUri}";
+
+                // Remember the device send time in case a mismatch occurs
+                DateTime responseTime = DateTime.Now;
+
+                // Write the outgoing log message
                 Logger.LogMessage("ReplayTransactions", sendLogMessage);
 
                 // Construct an HTTP request for the target device
@@ -782,7 +788,6 @@
                         // Create the incoming log message and save it for use if the device responds differently to the recorded outcome
                         responseLogMessage = $"◄── {response.StatusCode} {formattedString}";
 
-                        // Log the device response
                         Logger.LogMessage("ReplayTransactions", responseLogMessage);
 
                         try
@@ -826,12 +831,12 @@
                                         }
                                         else
                                         {
-                                            HandleMismatch(propertyName, sendLogMessage, responseLogMessage, "ELEMENTS ARE DIFFERENT", originalElem, currentElem);
+                                            HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, "ELEMENTS ARE DIFFERENT", originalElem, currentElem);
                                         }
                                     }
                                     else if (originalExists != currentExists) // One call returned this JSON element while the other did not...
                                     {
-                                        HandleMismatch(propertyName, sendLogMessage, responseLogMessage, "IS MISSING IN ONE RESPONSE", originalElem, currentElem);
+                                        HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, "IS MISSING IN ONE RESPONSE", originalElem, currentElem);
 
                                     }
                                     else // Neither response contained the required element
@@ -843,7 +848,7 @@
                                         }
                                         else // Other elements are expected always to be present
                                         {
-                                            HandleMismatch(propertyName, sendLogMessage, responseLogMessage, "IS MISSING IN BOTH RESPONSES", originalElem, currentElem);
+                                            HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, "IS MISSING IN BOTH RESPONSES", originalElem, currentElem);
                                         }
                                     }
                                 }
@@ -873,16 +878,17 @@
                 }
             }
 
-            if (MismatchRecords.Count > 0)
+            int mismatchCount = MismatchRecords.Count;
+            if (mismatchCount > 0)
             {
-                Logger.LogMessage("", $"There were {MismatchRecords.Count} mismatches.");
+                Logger.LogMessage("", $"There {(mismatchCount == 1 ? "was" : "were")} {mismatchCount} mismatch{(mismatchCount == 1 ? "" : "es")}.");
                 Logger.Newlines(1);
 
                 // List all the mismatches
                 int issueCount = 1;
                 foreach (MismatchRecord mismatch in MismatchRecords)
                 {
-                    Logger.LogMessage("ReplayTransactions", $"Issue {issueCount}");
+                    Logger.LogMessage("ReplayTransactions", $"Mismatch {issueCount} at replay time: {mismatch.mismatchTime:HH:mm:ss.fff}");
                     Logger.LogMessage("ReplayTransactions", $"{mismatch.sendLogMessage}");
                     Logger.LogMessage("ReplayTransactions", $"{mismatch.responseLogMessage}");
                     Logger.LogMessage("ReplayTransactions", $"    {mismatch.mismatchMessage}");
@@ -904,19 +910,19 @@
         }
     }
 
-    void HandleMismatch(string propertyName, string sendLogMessage, string responseLogMessage, string mismatchDescription, JsonElement originalJsonResponse, JsonElement currentJsonResponse)
+    void HandleMismatch(DateTime mismatchTime, string propertyName, string sendLogMessage, string responseLogMessage, string mismatchDescription, JsonElement originalJsonResponse, JsonElement currentJsonResponse)
     {
         string originalJsonString = GetDisplayString(originalJsonResponse);
         string currentJsonString = GetDisplayString(currentJsonResponse);
-        string overallMismatchMessage = $"{propertyName.ToUpperInvariant()} {mismatchDescription}";
+        string mismatchMessage = $"{propertyName.ToUpperInvariant()} {mismatchDescription}";
 
         // Log the mismatch message
-        Logger.LogMessage("ReplayTransactions", $"    {overallMismatchMessage}");
+        Logger.LogMessage("ReplayTransactions", $"    {mismatchMessage}");
         Logger.LogMessage("ReplayTransactions", $"      Original: {originalJsonString}");
         Logger.LogMessage("ReplayTransactions", $"      Current:  {currentJsonString}");
 
         // Add the mismatch record to the list for later display
-        MismatchRecords.Add(new MismatchRecord(sendLogMessage, responseLogMessage, originalJsonString, currentJsonString, overallMismatchMessage));
+        MismatchRecords.Add(new MismatchRecord(mismatchTime, sendLogMessage, responseLogMessage, originalJsonString, currentJsonString, mismatchMessage));
     }
 
     // Function to format JSON elements for logging, pretty-printing objects and arrays
