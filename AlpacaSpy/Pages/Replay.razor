@@ -281,6 +281,9 @@
 </div>
 
 @code {
+    // Define variable to hold any mis-matches between the original recording and current device behaviour
+    List<MismatchRecord> MismatchRecords = new();
+
     protected override Task OnInitializedAsync()
     {
         return base.OnInitializedAsync();
@@ -504,6 +507,15 @@
         }
     }
 
+    private record MismatchRecord(string sendLogMessage, string responseLogMessage, string originalJsonString, string currentJsonString, string mismatchMessage)
+    {
+        string SendLogMessage { get; set; } = sendLogMessage;
+        string ResponseLogMessage { get; set; } = responseLogMessage;
+        string OriginalJsonString { get; set; } = originalJsonString;
+        string CurrentJsonString { get; set; } = currentJsonString;
+        string ErrorMessage { get; set; } = mismatchMessage;
+    }
+
     /// <summary>
     /// Entry point for replaying transactions from the selected JSON file.
     /// Creates a local variable <c>selectedFile</c> containing the selected file full path.
@@ -511,6 +523,9 @@
     /// </summary>
     async Task ReplayTransactions()
     {
+        // Define variables to hold any mis-matches between the original recording and current device behaviour
+        string sendLogMessage, responseLogMessage = string.Empty;
+
         // local variable containing the selected file name
         string? selectedFile = State.ReplaySelectedFileFullName;
 
@@ -660,6 +675,8 @@
             DateTime startOfRecording = transactions.Count > 0 ? transactions[0].RequestTimeSent : DateTime.MinValue;  // Initialise the time at which the original recording started from the first transaction if it exists
             DateTime startOfPlayback = DateTime.Now; // Initialise the time at which playback started
 
+            Logger.Newlines(1);
+
             // Send each recorded item to the selected device in turn and log the outcome
             foreach (AlpacaTransaction transaction in transactions)
             {
@@ -687,7 +704,10 @@
 
                 // Create the target URI based on the targe device's IP address, port and Alpaca device number
                 string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}{transaction.RequestUri}";
-                Logger.LogMessage("ReplayTransactions", $"──► {transaction.RequestMethod} {Capitalise(methodName)} - {targetUri}");
+
+                // Create the outgoing log message and save it for use if the device responds differently to the recorded outcome
+                sendLogMessage = $"──► {transaction.RequestMethod} {Capitalise(methodName)} - {targetUri}";
+                Logger.LogMessage("ReplayTransactions", sendLogMessage);
 
                 // Construct an HTTP request for the target device
                 HttpRequestMessage request = new HttpRequestMessage(new HttpMethod(transaction.RequestMethod), targetUri);
@@ -757,8 +777,11 @@
                             // Do nothing, formattedString retains its original value: responseString
                         }
 
+                        // Create the incoming log message and save it for use if the device responds differently to the recorded outcome
+                        responseLogMessage = $"◄── {response.StatusCode} {formattedString}";
+
                         // Log the device response
-                        Logger.LogMessage("ReplayTransactions", $"◄── {response.StatusCode} {formattedString}");
+                        Logger.LogMessage("ReplayTransactions", responseLogMessage);
 
                         try
                         {
@@ -774,35 +797,24 @@
                             formattedString = $"Pretty-print failure - could not display original response: {ex.Message}.";
                         }
 
-
-                        // Compare "Value" property if present in both responses when the status is 200 OK
+                        // Compare "Value" "ErrorNumber" and "ErrorMessage" properties if present in both responses when the status is 200 OK
                         if (response.StatusCode == System.Net.HttpStatusCode.OK && transaction.Response != null)
                         {
                             try
                             {
-                                using JsonDocument currentDoc = JsonDocument.Parse(responseString);
+                                // Define a list of JSON element names to check for equivalence between the recorded response and the current response
                                 string[] propertiesToCompare = ["Value", "ErrorNumber", "ErrorMessage"];
+                                using JsonDocument currentDoc = JsonDocument.Parse(responseString);
 
+                                // Check each JSON name in turn
                                 foreach (string propertyName in propertiesToCompare)
                                 {
+                                    // Determine whether the JSON name exists in the original and current responses
                                     bool originalExists = transaction.Response.RootElement.TryGetProperty(propertyName, out JsonElement originalElem);
                                     bool currentExists = currentDoc.RootElement.TryGetProperty(propertyName, out JsonElement currentElem);
 
-                                    // Local function to format JSON elements for logging, pretty-printing objects and arrays
-                                    string GetDisplayString(JsonElement element)
-                                    {
-                                        if (element.ValueKind == JsonValueKind.Object || element.ValueKind == JsonValueKind.Array)
-                                        {
-                                            return JsonSerializer.Serialize(element, new JsonSerializerOptions
-                                            {
-                                                WriteIndented = true,
-                                                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                                            });
-                                        }
-                                        return element.GetRawText();
-                                    }
-
-                                    if (originalExists && currentExists) // Command returns a value
+                                    // Handle different combinations of elements being present and not present
+                                    if (originalExists && currentExists) // Command returns this element in both cases
                                     {
                                         if (Regex.Replace(originalElem.GetRawText(), @"\s+", "") == Regex.Replace(currentElem.GetRawText(), @"\s+", ""))
                                         {
@@ -812,27 +824,29 @@
                                         }
                                         else
                                         {
-                                            Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} ELEMENTS ARE DIFFERENT\r\nOriginal: {GetDisplayString(originalElem)}\r\nCurrent: {GetDisplayString(currentElem)}");
+                                            HandleMismatch(propertyName, sendLogMessage, responseLogMessage, "ELEMENTS ARE DIFFERENT", originalElem, currentElem);
                                         }
                                     }
-                                    else if (originalExists != currentExists) // One call returned a JSON Value element while the other did not...
+                                    else if (originalExists != currentExists) // One call returned this JSON element while the other did not...
                                     {
-                                        Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} IS MISSING IN ONE RESPONSE\r\nOriginal: {GetDisplayString(originalElem)}\r\nCurrent: {GetDisplayString(currentElem)}");
+                                        HandleMismatch(propertyName, sendLogMessage, responseLogMessage, "IS MISSING IN ONE RESPONSE", originalElem, currentElem);
+
                                     }
-                                    else //Method - Neither response had the required element
+                                    else // Neither response contained the required element
                                     {
+                                        // Handle Value as a special case because it can legitimately be absent in a method response
                                         if (propertyName.ToUpperInvariant() == "VALUE")
                                         {
                                             Logger.LogMessage("ReplayTransactions", "    Method - no Value element.");
                                         }
-                                        else
+                                        else // Other elements are expected always to be present
                                         {
-                                            Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpper()} IS MISSING IN BOTH RESPONSES\r\nOriginal: {GetDisplayString(originalElem)}\r\nCurrent: {GetDisplayString(currentElem)}");
+                                            HandleMismatch(propertyName, sendLogMessage, responseLogMessage, "IS MISSING IN BOTH RESPONSES", originalElem, currentElem);
                                         }
                                     }
                                 }
 
-                                Logger.LogMessage("ReplayTransactions", "\r\n");
+                                Logger.Newlines(1);
                             }
                             catch (Exception ex)
                             {
@@ -856,12 +870,62 @@
                     break;
                 }
             }
+
+            if (MismatchRecords.Count > 0)
+            {
+                Logger.LogMessage("", $"There were {MismatchRecords.Count} mismatches.");
+                Logger.Newlines(1);
+
+                // List all the mismatches
+                foreach (MismatchRecord mismatch in MismatchRecords)
+                {
+                    Logger.LogMessage("ReplayTransactions", $"{mismatch.sendLogMessage}");
+                    Logger.LogMessage("ReplayTransactions", $"{mismatch.responseLogMessage}");
+                    Logger.LogMessage("ReplayTransactions", $"    {mismatch.mismatchMessage}");
+                    Logger.LogMessage("ReplayTransactions", $"      Original: {mismatch.originalJsonString}");
+                    Logger.LogMessage("ReplayTransactions", $"      Current:  {mismatch.currentJsonString}");
+                    Logger.Newlines(1);
+                }
+            }
+            else
+            {
+                Logger.LogMessage("", "There were no mismatches");
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError("ReplayTransactions", $"Error replaying file '{selectedFile}': {ex.Message}\r\n{ex}");
             await DialogService.Alert($"Error while replaying, see Home page for details: {ex.Message}", "Unable to Replay", null);
         }
+    }
+
+    void HandleMismatch(string propertyName, string sendLogMessage, string responseLogMessage, string mismatchDescription, JsonElement originalJsonResponse, JsonElement currentJsonResponse)
+    {
+        string originalJsonString = GetDisplayString(originalJsonResponse);
+        string currentJsonString = GetDisplayString(currentJsonResponse);
+        string overallMismatchMessage = $"{propertyName.ToUpperInvariant()} {mismatchDescription}";
+
+        // Log the mismatch message
+        Logger.LogMessage("ReplayTransactions", $"    {overallMismatchMessage}");
+        Logger.LogMessage("ReplayTransactions", $"      Original: {originalJsonString}");
+        Logger.LogMessage("ReplayTransactions", $"      Current:  {currentJsonString}");
+
+        // Add the mismatch record to the list for later display
+        MismatchRecords.Add(new MismatchRecord(sendLogMessage, responseLogMessage, originalJsonString, currentJsonString, overallMismatchMessage));
+    }
+
+    // Function to format JSON elements for logging, pretty-printing objects and arrays
+    string GetDisplayString(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object || element.ValueKind == JsonValueKind.Array)
+        {
+            return JsonSerializer.Serialize(element, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
+        }
+        return element.GetRawText();
     }
 
     string FormatJsonNameValuePairs(JsonDocument? document)

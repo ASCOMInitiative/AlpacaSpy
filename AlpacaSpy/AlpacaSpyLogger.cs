@@ -83,12 +83,12 @@ namespace AlpacaSpy
                             {
                                 state.ApplicationLog.Append($"\r\n{formattedMessage}");
                             }
-                            catch (ArgumentOutOfRangeException ex)
+                            catch (ArgumentOutOfRangeException)
                             {
                                 int originalLength = state.ApplicationLog.Length;
                                 state.ApplicationLog.Remove(0, Globals.LOG_TRUNCATION_CHARACTERS);
                                 int newLength = state.ApplicationLog.Length;
-                                state.ApplicationLog.Insert(0, $"\r\n**** {ex.Message} Log truncated at {DateTime.Now:HH:mm:ss.fff} original length: {originalLength}, new length: {newLength} ****\r\n");
+                                state.ApplicationLog.Insert(0, $"\r\n**** Log truncated at {DateTime.Now:HH:mm:ss.fff} ****\r\n");
                                 state.ApplicationLog.Append($"{formattedMessage}");
                             }
 
@@ -121,6 +121,17 @@ namespace AlpacaSpy
             lock(Globals.writeLogLock)
             {
                 state.ApplicationLog.Clear();
+            }
+        }
+        public void Newlines(int count)
+        {
+            lock (Globals.writeLogLock)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    state.ApplicationLog.AppendLine();
+                    base.LogMessage(string.Empty, string.Empty);
+                }
             }
         }
 
