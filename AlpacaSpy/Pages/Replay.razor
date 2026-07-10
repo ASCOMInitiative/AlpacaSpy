@@ -1,7 +1,9 @@
 ﻿@page "/filebrowser"
 @using ASCOM.Tools
+@using ASCOM.Common
 @using System.Text.Json
 @using System.Text.RegularExpressions
+
 @inject FileBrowserService Browser
 @inject NavigationManager Navigation
 @inject AlpacaSpyLogger Logger
@@ -706,7 +708,7 @@
                 string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}{transaction.RequestUri}";
 
                 // Create the outgoing log message and save it for use if the device responds differently to the recorded outcome
-                sendLogMessage = $"──► {transaction.RequestMethod} {Capitalise(methodName)} - {targetUri}";
+                sendLogMessage = $"──► {transaction.RequestMethod} {CapitaliseMemberName(methodName)} - {targetUri}";
                 Logger.LogMessage("ReplayTransactions", sendLogMessage);
 
                 // Construct an HTTP request for the target device
@@ -877,14 +879,17 @@
                 Logger.Newlines(1);
 
                 // List all the mismatches
+                int issueCount = 1;
                 foreach (MismatchRecord mismatch in MismatchRecords)
                 {
+                    Logger.LogMessage("ReplayTransactions", $"Issue {issueCount}");
                     Logger.LogMessage("ReplayTransactions", $"{mismatch.sendLogMessage}");
                     Logger.LogMessage("ReplayTransactions", $"{mismatch.responseLogMessage}");
                     Logger.LogMessage("ReplayTransactions", $"    {mismatch.mismatchMessage}");
                     Logger.LogMessage("ReplayTransactions", $"      Original: {mismatch.originalJsonString}");
                     Logger.LogMessage("ReplayTransactions", $"      Current:  {mismatch.currentJsonString}");
                     Logger.Newlines(1);
+                    issueCount++;
                 }
             }
             else
@@ -965,12 +970,22 @@
         return element.GetRawText();
     }
 
-    string Capitalise(string input)
+    string CapitaliseMemberName(string input)
     {
         if (string.IsNullOrEmpty(input))
             return input;
 
-        return char.ToUpper(input[0]) + input.Substring(1);
+        // Try to find the member name in the MemberNames enum in order to get its correctly capitalised version
+        try
+        {
+            // Return the correctly cased member name
+            return Enum.Parse<MemberNames>(input, true).ToString();
+        }
+        catch
+        {
+            // If the enum parse fails just capitalise the first letter
+            return char.ToUpper(input[0]) + input.Substring(1);
+        }
     }
 
     RenderFragment RenderDirectory(string path) => builder =>

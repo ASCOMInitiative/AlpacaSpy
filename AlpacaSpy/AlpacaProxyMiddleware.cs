@@ -50,9 +50,9 @@ namespace AlpacaSpy
 
         public async Task InvokeAsync(HttpContext context)
         {
+            logger.LogMessage("InvokeAsync", $"Entered");
             string path = context.Request.Path.Value ?? string.Empty;
             Match match = DeviceApiPattern.Match(path);
-
             // Only process paths that match the Alpaca API protocol, other paths are passed to the rest of the pipeline for processing
             if (!match.Success)
             {
@@ -167,7 +167,7 @@ namespace AlpacaSpy
 
                     // Save the transaction for later replaying
                     //for (int i = 1; i <= 1000; i++)
-                        state.Transactions[device].Add(transaction);
+                    state.Transactions[device].Add(transaction);
                 }
             }
             catch (Exception ex)
@@ -259,8 +259,7 @@ namespace AlpacaSpy
             return request;
         }
 
-        private void LogClientRequest(
-            HttpContext context, ConfiguredDevice device, byte[] bodyBytes, string method)
+        private void LogClientRequest(HttpContext context, ConfiguredDevice device, byte[] bodyBytes, string method)
         {
             StringBuilder sb = new();
             sb.Append($"──► {context.Request.Method} /api/v1/{device.DeviceType.ToString().ToLower()}/{device.ProxyDeviceNumber}/{method}{context.Request.QueryString}  [{device.Name}]");

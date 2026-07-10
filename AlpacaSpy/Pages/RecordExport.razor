@@ -132,7 +132,7 @@
             defaultExportPath = Path.Combine(TraceLogger.GetDefaultLogFilePath(DateTime.Now), $"AlpacaSpy.{device.DeviceType}.{device.ProxyDeviceNumber}{(device.RecordFileUniqueIds ? "." + Convert.ToInt32(DateTime.Now.TimeOfDay.TotalSeconds) : "")}.json");
             exportProgress = 0.0;
 
-            // Notify the UI that values have changed and wait 100ms for the UI to respond before writing rfecords.
+            // Notify the UI that values have changed and wait 100ms for the UI to respond before writing records.
             await InvokeAsync(StateHasChanged);
             await Task.Delay(100);
             // Write records to disk as a JSON file
