@@ -283,17 +283,22 @@
 </div>
 
 @code {
-    // Define variable to hold any mis-matches between the original recording and current device behaviour
-    List<MismatchRecord> MismatchRecords = new();
+    // Define replay mismatch message constants
+    const string VALUES_DIFFERENT_MESSAGE = "ELEMENTS ARE DIFFERENT";
+    const string ELEMENT_MISSING_IN_ONE_RESPONSE = "ELEMENT MISSING IN ONE RESPONSE";
+    const string ELEMENT_MISSING_IN_BOTH_RESPONSES = "ELEMENT MISSING IN BOTH RESPONSES";
+    static readonly string[] ReplayMismatchMessages = { VALUES_DIFFERENT_MESSAGE, ELEMENT_MISSING_IN_ONE_RESPONSE, ELEMENT_MISSING_IN_BOTH_RESPONSES };
 
-    protected override Task OnInitializedAsync()
-    {
-        return base.OnInitializedAsync();
-    }
+    // Define the list of properties to compare between the original recording and the current device response
+    static readonly string[] RESPONSE_PROPERTIES_TO_COMARE = { "Value", "ErrorNumber", "ErrorMessage" };
+
+    // Define a variable to hold data on any mis-matches between the original recording and current device behaviour
+    List<Mismatch> Mismatches = new();
 
     string? SelectedPath;
     List<System.IO.FileInfo> Files = new();
 
+    // File path breadcrumb parts, each with a display name and full path for navigation
     record Crumb(string Name, string FullPath);
     List<Crumb> BreadcrumbParts = new();
 
@@ -301,222 +306,20 @@
     Dictionary<string, List<string>> dirCache = new();
     HashSet<string> expanded = new();
 
-    // path normalization helper to keep keys consistent (no trailing separator)
-    /// <summary>
-    /// Normalize a path to a full path without a trailing directory separator.
-    /// Returns an empty string for null/empty input.
-    /// </summary>
-    string NormalizePath(string? path)
-    {
-        if (string.IsNullOrEmpty(path)) return string.Empty;
-        try
-        {
-            var fp = Path.GetFullPath(path);
-            return fp.TrimEnd(Path.DirectorySeparatorChar);
-        }
-        catch
-        {
-            return path.TrimEnd(Path.DirectorySeparatorChar);
-        }
-    }
-
-    // base mode: true = show disks (DriveInfo), false = show single baseRootPath (Documents)
+    // Base mode: true = show disks (DriveInfo), false = show single baseRootPath (Documents)
     bool baseIsDisks = true;
     string? baseRootPath = null;
 
+    // Variable to hold the current progress of the replay operation as a percentage
     double replayProgress = 0.0;
 
+    /// <summary>
+    /// Initialize the component.
+    /// </summary>
     protected override void OnInitialized()
     {
-        // default to ASCOM Logs view if available
+        // Default to ASCOM Logs view if available
         ShowAscomLogs(false);
-    }
-
-    /// <summary>
-    /// Return the (cached) list of subdirectories for <paramref name="path"/>.
-    /// Results are normalized and cached to avoid repeated IO.
-    /// </summary>
-    IEnumerable<string> GetDirectoriesCached(string path)
-    {
-        var key = NormalizePath(path);
-        if (!dirCache.TryGetValue(key, out var list))
-        {
-            var raw = Browser.GetDirectories(path)?.ToList() ?? new List<string>();
-            // normalize child paths for consistency
-            list = raw.Select(d => NormalizePath(d)).ToList();
-            dirCache[key] = list;
-        }
-        return dirCache[key];
-    }
-
-    /// <summary>
-    /// Toggle expanded/collapsed state for the specified <paramref name="path"/>.
-    /// </summary>
-    void ToggleExpand(string path)
-    {
-        var key = NormalizePath(path);
-        if (expanded.Contains(key))
-            expanded.Remove(key);
-        else
-            expanded.Add(key);
-    }
-
-    void SelectTargetDevice(AlpacaSpy.Models.ConfiguredDevice device)
-    {
-        State.ReplayTargetDevice = device;
-    }
-
-    /// <summary>
-    /// Returns true when the specified <paramref name="path"/> is marked expanded.
-    /// </summary>
-    bool IsExpanded(string path) => expanded.Contains(NormalizePath(path));
-
-    /// <summary>
-    /// Switch the tree to show the user's Documents folder as the base and select it.
-    /// </summary>
-    void ShowDocuments()
-    {
-        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        if (!string.IsNullOrEmpty(docs) && Directory.Exists(docs))
-        {
-            baseIsDisks = false;
-            baseRootPath = docs;
-            dirCache.Clear();
-            expanded.Clear();
-            State.ReplaySelectedFileFullName = null;
-
-            // Show the Documents folder itself as the root (do not auto-select a child)
-            NavigateTo(docs);
-            // ensure the root is expanded so children are visible
-            expanded.Add(NormalizePath(docs));
-            _ = GetDirectoriesCached(docs);
-        }
-    }
-
-    /// <summary>
-    /// Switch the tree to show system drives (Disks) as the base and select the first drive if present.
-    /// </summary>
-    void ShowDisks()
-    {
-        baseIsDisks = true;
-        baseRootPath = null;
-        dirCache.Clear();
-        expanded.Clear();
-        State.ReplaySelectedFileFullName = null;
-
-        // Select the first drive if present
-        var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
-        if (firstDrive != null && Directory.Exists(firstDrive.Name))
-        {
-            SelectPath(firstDrive.Name);
-        }
-    }
-
-    void ShowAscomLogsClickHandler()
-    {
-        ShowAscomLogs(true);
-    }
-
-    /// <summary>
-    /// Switch the tree to the ASCOM logs directory (via TraceLogger) and select the first visible child.
-    /// Falls back to the Disks view if the ASCOM log path is unavailable.
-    /// </summary>
-    void ShowAscomLogs(bool clearSelectedFile)
-    {
-        try
-        {
-            var dir = TraceLogger.GetDefaultLogFilePath(DateTime.Now);
-            // If TraceLogger returns a file path rather than a directory, get its directory
-            if (!string.IsNullOrEmpty(dir) && File.Exists(dir))
-            {
-                dir = Path.GetDirectoryName(dir) ?? dir;
-            }
-            baseIsDisks = false;
-            baseRootPath = dir;
-            dirCache.Clear();
-            expanded.Clear();
-            if (clearSelectedFile)
-            {
-                State.ReplaySelectedFileFullName = null;
-
-            }
-            // Select the first child under ASCOM logs, or the directory itself if no children
-            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-            {
-                var children = GetDirectoriesCached(dir).ToList();
-                if (children.Any())
-                {
-                    SelectPath(children.First());
-                }
-                else
-                {
-                    SelectPath(dir);
-                }
-            }
-        }
-        catch
-        {
-            // fallback to disks if ASCOM.Tools isn't available or call fails
-            baseIsDisks = true;
-            baseRootPath = null;
-            dirCache.Clear();
-            expanded.Clear();
-            State.ReplaySelectedFileFullName = null;
-
-            var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
-            if (firstDrive != null && Directory.Exists(firstDrive.Name))
-            {
-                SelectPath(firstDrive.Name);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Select the specified directory path, update breadcrumb and load JSON files in that directory.
-    /// </summary>
-    void SelectPath(string path)
-    {
-        if (Directory.Exists(path))
-        {
-            SelectedPath = path;
-            BuildBreadcrumb(path);
-
-            Files = new List<System.IO.FileInfo>();
-            foreach (var f in Browser.GetFiles(path))
-            {
-                if (f != null && f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-                {
-                    Files.Add(new System.IO.FileInfo(f));
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Handle radio selection changes for JSON files. Updates the currently selected file full path.
-    /// </summary>
-    void OnFileRadioChanged(string fullName, ChangeEventArgs e)
-    {
-        // Radio change value can be string or bool; treat any change as selection of this radio button.
-        if (e?.Value is bool b && b == false)
-        {
-            // some browsers/components may allow un-checking; treat as no selection
-            State.ReplaySelectedFileFullName = null;
-        }
-        else
-        {
-            State.ReplaySelectedFileFullName = fullName;
-        }
-    }
-
-    private record MismatchRecord(DateTime mismatchTime, string sendLogMessage, string responseLogMessage, string originalJsonString, string currentJsonString, string mismatchMessage)
-    {
-        DateTime MismatchTime { get; set; } = mismatchTime;
-        string SendLogMessage { get; set; } = sendLogMessage;
-        string ResponseLogMessage { get; set; } = responseLogMessage;
-        string OriginalJsonString { get; set; } = originalJsonString;
-        string CurrentJsonString { get; set; } = currentJsonString;
-        string MismatchMessage { get; set; } = mismatchMessage;
     }
 
     /// <summary>
@@ -787,12 +590,11 @@
 
                         // Create the incoming log message and save it for use if the device responds differently to the recorded outcome
                         responseLogMessage = $"◄── {response.StatusCode} {formattedString}";
-
                         Logger.LogMessage("ReplayTransactions", responseLogMessage);
 
+                        // Pretty-print the original response
                         try
                         {
-                            // Pretty-print the original response
                             formattedString = JsonSerializer.Serialize(transaction.Response, new JsonSerializerOptions()
                             {
                                 WriteIndented = Settings.PlaybackExpandJson,
@@ -804,17 +606,16 @@
                             formattedString = $"Pretty-print failure - could not display original response: {ex.Message}.";
                         }
 
-                        // Compare "Value" "ErrorNumber" and "ErrorMessage" properties if present in both responses when the status is 200 OK
+                        // If the response status is 200 OK, assess the device response's "Value", "ErrorNumber", and "ErrorMessage" properties against those in the original response.
                         if (response.StatusCode == System.Net.HttpStatusCode.OK && transaction.Response != null)
                         {
                             try
                             {
                                 // Define a list of JSON element names to check for equivalence between the recorded response and the current response
-                                string[] propertiesToCompare = ["Value", "ErrorNumber", "ErrorMessage"];
                                 using JsonDocument currentDoc = JsonDocument.Parse(responseString);
 
                                 // Check each JSON name in turn
-                                foreach (string propertyName in propertiesToCompare)
+                                foreach (string propertyName in RESPONSE_PROPERTIES_TO_COMARE)
                                 {
                                     // Determine whether the JSON name exists in the original and current responses
                                     bool originalExists = transaction.Response.RootElement.TryGetProperty(propertyName, out JsonElement originalElem);
@@ -823,20 +624,20 @@
                                     // Handle different combinations of elements being present and not present
                                     if (originalExists && currentExists) // Command returns this element in both cases
                                     {
-                                        if (Regex.Replace(originalElem.GetRawText(), @"\s+", "") == Regex.Replace(currentElem.GetRawText(), @"\s+", ""))
+                                        if (Regex.Replace(originalElem.GetRawText(), @"\s+", "") == Regex.Replace(currentElem.GetRawText(), @"\s+", "")) // Elements match exactly
                                         {
-                                            // Elements match
+                                            // Report when the Value elements match but don't report when ErrorMessage and ErrorNumber match just to cut down log noise
                                             if (propertyName.ToUpperInvariant() == "VALUE")
                                                 Logger.LogMessage("ReplayTransactions", $"    {propertyName} elements match.");
                                         }
-                                        else
+                                        else // Elements are different
                                         {
-                                            HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, "ELEMENTS ARE DIFFERENT", originalElem, currentElem);
+                                            HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, VALUES_DIFFERENT_MESSAGE, originalElem, currentElem);
                                         }
                                     }
                                     else if (originalExists != currentExists) // One call returned this JSON element while the other did not...
                                     {
-                                        HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, "IS MISSING IN ONE RESPONSE", originalElem, currentElem);
+                                        HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, ELEMENT_MISSING_IN_ONE_RESPONSE, originalElem, currentElem);
 
                                     }
                                     else // Neither response contained the required element
@@ -848,7 +649,7 @@
                                         }
                                         else // Other elements are expected always to be present
                                         {
-                                            HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, "IS MISSING IN BOTH RESPONSES", originalElem, currentElem);
+                                            HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, ELEMENT_MISSING_IN_BOTH_RESPONSES, originalElem, currentElem);
                                         }
                                     }
                                 }
@@ -860,17 +661,15 @@
                                 Logger.LogError("ReplayTransactions", $"Error assessing response to transaction {transaction.RequestUri}: {ex.Message}\r\n{ex}");
                             }
                         }
-
                     }
                     catch (Exception ex)
                     {
                         Logger.LogError("ReplayTransactions", $"Error sending request for {transaction.RequestUri}: {ex.Message}\r\n{ex}");
                         await DialogService.Alert($"Error while sending request or processing response, see Home page for details: {ex.Message}", "Unable to Replay", null);
                     }
-
                 });
 
-                // Exit if cancellation is requested
+                // End of processing this transaction - Exit if cancellation is requested
                 if (State.CancellationToken.IsCancellationRequested)
                 {
                     Logger.LogError("ReplayTransactions", $"Replay cancelled.");
@@ -878,29 +677,37 @@
                 }
             }
 
-            int mismatchCount = MismatchRecords.Count;
-            if (mismatchCount > 0)
+            // All transactions have been processed - report any mis-matches
+            int mismatchCount = Mismatches.Count;
+            if (mismatchCount > 0) // 1 or more mis-matches found
             {
-                Logger.LogMessage("", $"There {(mismatchCount == 1 ? "was" : "were")} {mismatchCount} mismatch{(mismatchCount == 1 ? "" : "es")}.");
+                // Log the number of mismatches found
+                Logger.LogMessage("", $"There {(mismatchCount == 1 ? "was" : "were")} {mismatchCount} mismatch{(mismatchCount == 1 ? "" : "es")} including:");
+
+                foreach (string message in ReplayMismatchMessages)
+                {
+                    int messageCount = Mismatches.Where((m) => m.MismatchMessage == message).Count();
+                    Logger.LogMessage("ReplayTransactions", $"    {messageCount} \"{message}\" message{(messageCount == 1 ? "" : "s")}.");
+                }
                 Logger.Newlines(1);
 
-                // List all the mismatches
+                // List any mismatches
                 int issueCount = 1;
-                foreach (MismatchRecord mismatch in MismatchRecords)
+                foreach (Mismatch mismatch in Mismatches)
                 {
-                    Logger.LogMessage("ReplayTransactions", $"Mismatch {issueCount} at replay time: {mismatch.mismatchTime:HH:mm:ss.fff}");
-                    Logger.LogMessage("ReplayTransactions", $"{mismatch.sendLogMessage}");
-                    Logger.LogMessage("ReplayTransactions", $"{mismatch.responseLogMessage}");
-                    Logger.LogMessage("ReplayTransactions", $"    {mismatch.mismatchMessage}");
-                    Logger.LogMessage("ReplayTransactions", $"      Original: {mismatch.originalJsonString}");
-                    Logger.LogMessage("ReplayTransactions", $"      Current:  {mismatch.currentJsonString}");
+                    Logger.LogMessage("ReplayTransactions", $"Mismatch {issueCount} at replay time: {mismatch.MismatchTime:HH:mm:ss.fff}");
+                    Logger.LogMessage("ReplayTransactions", $"{mismatch.SendLogMessage}");
+                    Logger.LogMessage("ReplayTransactions", $"{mismatch.ResponseLogMessage}");
+                    Logger.LogMessage("ReplayTransactions", $"    {mismatch.PropertyName.ToUpperInvariant()} {mismatch.MismatchMessage}");
+                    Logger.LogMessage("ReplayTransactions", $"      Original: {mismatch.OriginalJsonString}");
+                    Logger.LogMessage("ReplayTransactions", $"      Current:  {mismatch.CurrentJsonString}");
                     Logger.Newlines(1);
                     issueCount++;
                 }
             }
-            else
+            else // No mis-matches found
             {
-                Logger.LogMessage("", "There were no mismatches");
+                Logger.LogMessage("ReplayTransactions", "There were no mismatches");
             }
         }
         catch (Exception ex)
@@ -910,22 +717,230 @@
         }
     }
 
+    /// <summary>
+    /// Normalize a path to a full path without a trailing directory separator.
+    /// Returns an empty string for null/empty input.
+    /// </summary>
+    string NormalizePath(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return string.Empty;
+        try
+        {
+            var fp = Path.GetFullPath(path);
+            return fp.TrimEnd(Path.DirectorySeparatorChar);
+        }
+        catch
+        {
+            return path.TrimEnd(Path.DirectorySeparatorChar);
+        }
+    }
+
+    /// <summary>
+    /// Return the (cached) list of subdirectories for <paramref name="path"/>.
+    /// Results are normalized and cached to avoid repeated IO.
+    /// </summary>
+    IEnumerable<string> GetDirectoriesCached(string path)
+    {
+        var key = NormalizePath(path);
+        if (!dirCache.TryGetValue(key, out var list))
+        {
+            var raw = Browser.GetDirectories(path)?.ToList() ?? new List<string>();
+            // normalize child paths for consistency
+            list = raw.Select(d => NormalizePath(d)).ToList();
+            dirCache[key] = list;
+        }
+        return dirCache[key];
+    }
+
+    /// <summary>
+    /// Toggle expanded/collapsed state for the specified <paramref name="path"/>.
+    /// </summary>
+    void ToggleExpand(string path)
+    {
+        var key = NormalizePath(path);
+        if (expanded.Contains(key))
+            expanded.Remove(key);
+        else
+            expanded.Add(key);
+    }
+
+    void SelectTargetDevice(AlpacaSpy.Models.ConfiguredDevice device)
+    {
+        State.ReplayTargetDevice = device;
+    }
+
+    /// <summary>
+    /// Returns true when the specified <paramref name="path"/> is marked expanded.
+    /// </summary>
+    bool IsExpanded(string path) => expanded.Contains(NormalizePath(path));
+
+    /// <summary>
+    /// Switch the tree to show the user's Documents folder as the base and select it.
+    /// </summary>
+    void ShowDocuments()
+    {
+        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        if (!string.IsNullOrEmpty(docs) && Directory.Exists(docs))
+        {
+            baseIsDisks = false;
+            baseRootPath = docs;
+            dirCache.Clear();
+            expanded.Clear();
+            State.ReplaySelectedFileFullName = null;
+
+            // Show the Documents folder itself as the root (do not auto-select a child)
+            NavigateTo(docs);
+            // ensure the root is expanded so children are visible
+            expanded.Add(NormalizePath(docs));
+            _ = GetDirectoriesCached(docs);
+        }
+    }
+
+    /// <summary>
+    /// Switch the tree to show system drives (Disks) as the base and select the first drive if present.
+    /// </summary>
+    void ShowDisks()
+    {
+        baseIsDisks = true;
+        baseRootPath = null;
+        dirCache.Clear();
+        expanded.Clear();
+        State.ReplaySelectedFileFullName = null;
+
+        // Select the first drive if present
+        var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
+        if (firstDrive != null && Directory.Exists(firstDrive.Name))
+        {
+            SelectPath(firstDrive.Name);
+        }
+    }
+
+    void ShowAscomLogsClickHandler()
+    {
+        ShowAscomLogs(true);
+    }
+
+    /// <summary>
+    /// Switch the tree to the ASCOM logs directory (via TraceLogger) and select the first visible child.
+    /// Falls back to the Disks view if the ASCOM log path is unavailable.
+    /// </summary>
+    void ShowAscomLogs(bool clearSelectedFile)
+    {
+        try
+        {
+            var dir = TraceLogger.GetDefaultLogFilePath(DateTime.Now);
+            // If TraceLogger returns a file path rather than a directory, get its directory
+            if (!string.IsNullOrEmpty(dir) && File.Exists(dir))
+            {
+                dir = Path.GetDirectoryName(dir) ?? dir;
+            }
+            baseIsDisks = false;
+            baseRootPath = dir;
+            dirCache.Clear();
+            expanded.Clear();
+            if (clearSelectedFile)
+            {
+                State.ReplaySelectedFileFullName = null;
+
+            }
+            // Select the first child under ASCOM logs, or the directory itself if no children
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+                var children = GetDirectoriesCached(dir).ToList();
+                if (children.Any())
+                {
+                    SelectPath(children.First());
+                }
+                else
+                {
+                    SelectPath(dir);
+                }
+            }
+        }
+        catch
+        {
+            // fallback to disks if ASCOM.Tools isn't available or call fails
+            baseIsDisks = true;
+            baseRootPath = null;
+            dirCache.Clear();
+            expanded.Clear();
+            State.ReplaySelectedFileFullName = null;
+
+            var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
+            if (firstDrive != null && Directory.Exists(firstDrive.Name))
+            {
+                SelectPath(firstDrive.Name);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Select the specified directory path, update breadcrumb and load JSON files in that directory.
+    /// </summary>
+    void SelectPath(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            SelectedPath = path;
+            BuildBreadcrumb(path);
+
+            Files = new List<System.IO.FileInfo>();
+            foreach (var f in Browser.GetFiles(path))
+            {
+                if (f != null && f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    Files.Add(new System.IO.FileInfo(f));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Handle radio selection changes for JSON files. Updates the currently selected file full path.
+    /// </summary>
+    void OnFileRadioChanged(string fullName, ChangeEventArgs e)
+    {
+        // Radio change value can be string or bool; treat any change as selection of this radio button.
+        if (e?.Value is bool b && b == false)
+        {
+            // some browsers/components may allow un-checking; treat as no selection
+            State.ReplaySelectedFileFullName = null;
+        }
+        else
+        {
+            State.ReplaySelectedFileFullName = fullName;
+        }
+    }
+
+    /// <summary>
+    /// Handles a mismatch between the original and current JSON responses.
+    /// </summary>
+    /// <param name="mismatchTime">The time the mismatch was detected.</param>
+    /// <param name="propertyName">The name of the property that mismatched.</param>
+    /// <param name="sendLogMessage">The log message for the sent request.</param>
+    /// <param name="responseLogMessage">The log message for the received response.</param>
+    /// <param name="mismatchDescription">A description of the mismatch.</param>
+    /// <param name="originalJsonResponse">The original JSON response.</param>
+    /// <param name="currentJsonResponse">The current JSON response.</param>
     void HandleMismatch(DateTime mismatchTime, string propertyName, string sendLogMessage, string responseLogMessage, string mismatchDescription, JsonElement originalJsonResponse, JsonElement currentJsonResponse)
     {
         string originalJsonString = GetDisplayString(originalJsonResponse);
         string currentJsonString = GetDisplayString(currentJsonResponse);
-        string mismatchMessage = $"{propertyName.ToUpperInvariant()} {mismatchDescription}";
 
         // Log the mismatch message
-        Logger.LogMessage("ReplayTransactions", $"    {mismatchMessage}");
+        Logger.LogMessage("ReplayTransactions", $"    {propertyName.ToUpperInvariant()} {mismatchDescription}");
         Logger.LogMessage("ReplayTransactions", $"      Original: {originalJsonString}");
         Logger.LogMessage("ReplayTransactions", $"      Current:  {currentJsonString}");
 
         // Add the mismatch record to the list for later display
-        MismatchRecords.Add(new MismatchRecord(mismatchTime, sendLogMessage, responseLogMessage, originalJsonString, currentJsonString, mismatchMessage));
+        Mismatches.Add(new Mismatch(mismatchTime, sendLogMessage, responseLogMessage, originalJsonString, currentJsonString, mismatchDescription, propertyName));
     }
 
-    // Function to format JSON elements for logging, pretty-printing objects and arrays
+    /// <summary>
+    /// Formats a JSON element for display, pretty-printing objects and arrays.
+    /// </summary>
+    /// <param name="element">The JSON element to format.</param>
+    /// <returns>A formatted string representation of the JSON element.</returns>
     string GetDisplayString(JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object || element.ValueKind == JsonValueKind.Array)
@@ -939,14 +954,11 @@
         return element.GetRawText();
     }
 
-    string FormatJsonNameValuePairs(JsonDocument? document)
-    {
-        if (document is null)
-            return string.Empty;
-
-        return FormatJsonNameValuePairs(document.RootElement);
-    }
-
+    /// <summary>
+    /// Formats a JSON element into a string of name-value pairs.
+    /// </summary>
+    /// <param name="element">The JSON element to format.</param>
+    /// <returns>A string representation of the JSON element's name-value pairs.</returns>
     string FormatJsonNameValuePairs(JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object)
@@ -976,6 +988,11 @@
         return element.GetRawText();
     }
 
+    /// <summary>
+    /// Creates a correctly capitalised version of the member's name
+    /// </summary>
+    /// <param name="input">The member name to capitalise.</param>
+    /// <returns>The capitalised member name.</returns>
     string CapitaliseMemberName(string input)
     {
         if (string.IsNullOrEmpty(input))
@@ -994,6 +1011,11 @@
         }
     }
 
+    /// <summary>
+    /// Renders a directory and its children as a tree structure.
+    /// </summary>
+    /// <param name="path">The path of the directory to render.</param>
+    /// <returns>A RenderFragment representing the directory tree.</returns>
     RenderFragment RenderDirectory(string path) => builder =>
     {
         // simple recursive renderer: shows one level and an expander if children exist
@@ -1042,6 +1064,7 @@
     /// <summary>
     /// Build the breadcrumb parts for the given <paramref name="path"/>.
     /// </summary>
+    /// <param name="path">The path for which to build the breadcrumb.</param>
     void BuildBreadcrumb(string path)
     {
         BreadcrumbParts.Clear();
@@ -1059,6 +1082,10 @@
         }
     }
 
+    /// <summary>
+    /// Navigates to the specified path, updating the selected path, breadcrumb, and file list.
+    /// </summary>
+    /// <param name="path">The path to navigate to.</param>
     void NavigateTo(string path)
     {
         SelectedPath = path;
@@ -1105,6 +1132,9 @@
         InvokeAsync(StateHasChanged);
     }
 
+    /// <summary>
+    /// Navigates to the parent directory of the currently selected path.
+    /// </summary>
     void GoUpOneLevel()
     {
         if (string.IsNullOrEmpty(SelectedPath))
@@ -1117,6 +1147,10 @@
         }
     }
 
+    /// <summary>
+    /// Expands all ancestor directories of the specified path, ensuring they are visible in the UI.
+    /// </summary>
+    /// <param name="path">The path whose ancestors should be expanded.</param>
     void ExpandAncestors(string path)
     {
         try
