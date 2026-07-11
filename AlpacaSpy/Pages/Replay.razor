@@ -703,9 +703,25 @@
                 // Log the number of mismatches found
                 Logger.LogMessage("", $"There {(mismatchCount == 1 ? "was" : "were")} {mismatchCount} mismatch{(mismatchCount == 1 ? "" : "es")} including:");
 
+                // Count the total number of Mismatch objects across all summaries that have each possible message
                 foreach (string message in ReplayMismatchMessages)
                 {
-                    int messageCount = 0; 
+                    // Count the total number of Mismatch objects across all summaries that have this message
+                    int messageCount = 0;
+                    foreach (MismatchSummary summary in Mismatches) // Iterate over MismatchSummary records
+                    {
+                        if (summary.Mismatches == null) continue;
+                        foreach (Mismatch mm in summary.Mismatches) // Iterate over the Mismatch records in each MismatchSummary record
+                        {
+                            if (string.Equals(mm.MismatchMessage, message, StringComparison.Ordinal)) // This Mismatch does contain the mismatch type being counted
+                            {
+                                // Increment the count
+                                messageCount++;
+                            }
+                        }
+                    }
+
+                    // Log the outcome
                     Logger.LogMessage("ReplayTransactions", $"    {messageCount} \"{message}\" message{(messageCount == 1 ? "" : "s")}.");
                 }
                 Logger.Newlines(1);
