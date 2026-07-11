@@ -1,3 +1,4 @@
+using AlpacaSpy.Models;
 using ASCOM.Common;
 using ASCOM.Common.Interfaces;
 using ASCOM.Tools;

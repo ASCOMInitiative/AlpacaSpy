@@ -1,4 +1,4 @@
-﻿namespace AlpacaSpy
+﻿namespace AlpacaSpy.Models
 {
     /// <summary>
     /// Represents a mismatch between the expected and actual data in the AlpacaSpy application.

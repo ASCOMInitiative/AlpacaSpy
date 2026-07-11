@@ -1,6 +1,6 @@
 using ASCOM.Alpaca;
 
-namespace AlpacaSpy
+namespace AlpacaSpy.Models
 {
     internal class AlpacaConfiguration : IAlpacaConfiguration
     {

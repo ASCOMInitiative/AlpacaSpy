@@ -1,4 +1,4 @@
-namespace AlpacaSpy
+namespace AlpacaSpy.Models
 {
     public class MessageEventArgs : EventArgs
     {
