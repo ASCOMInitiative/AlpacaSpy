@@ -119,20 +119,43 @@ namespace AlpacaSpy
         public void LogError(string message) => LogError(string.Empty, message);
         public void ClearScreen()
         {
-            lock(Globals.writeLogLock)
+            lock (Globals.writeLogLock)
             {
                 state.ApplicationLog.Clear();
             }
         }
+        /// <summary>
+        /// Append the specified number of new lines to the output
+        /// </summary>
+        /// <param name="count">The number of new lines to add</param>
         public void Newlines(int count)
         {
             lock (Globals.writeLogLock)
             {
                 for (int i = 0; i < count; i++)
                 {
-                    state.ApplicationLog.AppendLine();
-                    base.LogMessage(string.Empty, string.Empty);
+                    // Try to append the line
+                    try
+                    {
+                        state.ApplicationLog.AppendLine();
+                        // Appended successfully
+                    }
+                    catch (ArgumentOutOfRangeException) // Exceeded the screen log length so truncate it
+                    {
+                        // Truncate the screen log
+                        int originalLength = state.ApplicationLog.Length;
+                        state.ApplicationLog.Remove(0, Globals.LOG_TRUNCATION_CHARACTERS);
+
+                        // Write the new line to the truncated screen log
+                        state.ApplicationLog.AppendLine();
+
+                        // Add a record to the written log
+                        base.LogMessage(string.Empty, string.Empty);
+                    }
                 }
+
+                // Notify listeners that the screen log has changed.
+                OnMessageLogChanged("\r\n");
             }
         }
 

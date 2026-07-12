@@ -18,8 +18,7 @@ namespace AlpacaSpy
     /// </summary>
     public class AlpacaProxyMiddleware(RequestDelegate next, IHttpClientFactory httpClientFactory, State state, AlpacaSpyLogger logger)
     {
-        private static readonly Regex DeviceApiPattern =
-            new(@"^/api/v1/([^/]+)/(\d+)/([^?]*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DeviceApiPattern = new(@"^/api/v1/([^/]+)/(\d+)/([^?]*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         // Canonical Alpaca URL path segment → enum mapping (case-insensitive lookup)
         private static readonly Dictionary<string, AlpacaDeviceType> DeviceTypeMap =
@@ -110,10 +109,17 @@ namespace AlpacaSpy
             byte[] responseBytes;
             try
             {
+                // Record the time that the request was sent to the device
                 DateTime requestSentToDevice = DateTime.Now;
+
+                // Send the request to the device and read the response content into a byte array
                 responseMessage = await client.SendAsync(forwardRequest, HttpCompletionOption.ResponseContentRead);
                 responseBytes = await responseMessage.Content.ReadAsByteArrayAsync();
+
+                // Record the time that the response was received from the device
                 DateTime responseFromDevice = DateTime.Now;
+
+                // Record the transaction if configured to do so
                 if (device.RecordTransactions)
                 {
                     AlpacaTransaction transaction = new AlpacaTransaction()
@@ -136,6 +142,7 @@ namespace AlpacaSpy
                         ResponseTime = responseFromDevice - requestSentToDevice,
                     };
 
+                    // Handle ImageArray and ImageArrayVariant responses differently to everything else
                     string responseString = responseBytes.Length > 0 ? Encoding.UTF8.GetString(responseBytes) : "";
                     try
                     {
@@ -144,28 +151,34 @@ namespace AlpacaSpy
                     }
                     catch // The supplied string was not parseable into a JSON string so create a valid JSON document that contains the response string as a plain string value
                     {
-                        // Ensure that this reporting mechanic does not interrupt recording if it fails.
-                        try
+                        if (!method.Contains("imagearray")) // Normal action, this is not an ImageArray or ImageArrayVariant request
                         {
-                            // Create a JSON string containing the response string as a property value. 
-                            // NOTE: This tricky piece of code works by creating a temporary anonymous object, assigning responseString's value to its property "UnparsableResponse" and then serializing that object into a JSON string.
-                            string json = JsonSerializer.Serialize(new
+                            // Ensure that this reporting mechanic does not interrupt recording if it fails.
+                            try
                             {
-                                UnparsableResponse = responseString
-                            });
+                                // Create a JSON string containing the response string as a property value. 
+                                // NOTE: This tricky piece of code works by creating a temporary anonymous object, assigning responseString's value to its property "UnparsableResponse" and then serializing that object into a JSON string.
+                                string json = JsonSerializer.Serialize(new
+                                {
+                                    UnparsableResponse = responseString
+                                });
 
-                            // Parse the JSON string into a JSON document and save it
-                            JsonDocument document = JsonDocument.Parse(json);
-                            transaction.Response = document;
+                                // Parse the JSON string into a JSON document and save it
+                                JsonDocument document = JsonDocument.Parse(json);
+                                transaction.Response = document;
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogError("AlpacaProxyMiddleware", $"Error parsing response: {responseString}\r\n{ex}");
+                            }
                         }
-                        catch (Exception ex)
+                        else // This is likely an ImageArray or ImageArrayVariant ImageBytes response so provide a proxy for recording purposes.
                         {
-                            logger.LogError("AlpacaProxyMiddleware", $"Error parsing response: {responseString}\r\n{ex}");
+                            transaction.Response = JsonDocument.Parse(Globals.IMAGEBYTES_PROXY_RESPONSE);
                         }
                     }
 
                     // Save the transaction for later replaying
-                    //for (int i = 1; i <= 1000; i++)
                     state.Transactions[device].Add(transaction);
                 }
             }

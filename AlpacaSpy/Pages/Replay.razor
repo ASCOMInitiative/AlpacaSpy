@@ -474,8 +474,8 @@
             Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/\d+\/(?<Method>[^\/\?]+)", RegexOptions.IgnoreCase);
 
             // Set time counters for the original file and the current playback
-            TimeSpan timeSinceRecodingStart = TimeSpan.FromSeconds(0.0);
-            TimeSpan timeSincePlaybackStart = TimeSpan.FromSeconds(0.0);
+            //TimeSpan timeSinceRecodingStart = TimeSpan.FromSeconds(0.0);
+            //TimeSpan timeSincePlaybackStart = TimeSpan.FromSeconds(0.0);
 
             // Initialise start times for the recoding and playback
             DateTime startOfRecording = transactions.Count > 0 ? transactions[0].RequestTimeSent : DateTime.MinValue;  // Initialise the time at which the original recording started from the first transaction if it exists
@@ -484,19 +484,9 @@
             Logger.Newlines(1);
 
             // Send each recorded item to the selected device in turn and log the outcome
+            int transactionNumber = 0; // Number of this transaction (used in calculating additional delays)
             foreach (AlpacaTransaction transaction in transactions)
             {
-                timeSinceRecodingStart = transaction.RequestTimeSent - startOfRecording;
-                timeSincePlaybackStart = DateTime.Now - startOfPlayback;
-
-                // Calculate the required delay in integer milliseconds, which is the time between this and the last transaction
-                int delayMs = (int)timeSinceRecodingStart.Subtract(timeSincePlaybackStart).TotalMilliseconds;
-                Logger.LogDebug("ReplayTransactions", $"Txn time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Calculated delay: {delayMs:0.0} milliseconds. Time since recording start: {timeSinceRecodingStart.TotalSeconds:0.000}," +
-                    $" Time since playback start: {timeSincePlaybackStart.TotalSeconds:0.000}");
-
-                // Apply the delay if it is positive
-                await Task.Delay(delayMs >= 0 ? delayMs : 0);
-
                 // Get the method being called
                 Match match = uriRegex.Match(transaction.RequestUri ?? string.Empty);
 
@@ -562,6 +552,19 @@
                     }
                 }
 
+                // Calculate time differentials
+                TimeSpan timeSinceRecodingStart = transaction.RequestTimeSent.Subtract(startOfRecording); // .Add(TimeSpan.FromMilliseconds(50.0 * transactionNumber));
+                TimeSpan timeSincePlaybackStart = DateTime.Now - startOfPlayback;
+
+                // Calculate the required delay in integer milliseconds, which is the time between this and the last transaction
+                int delayMs = (int)timeSinceRecodingStart.Subtract(timeSincePlaybackStart).TotalMilliseconds;
+                Logger.LogDebug("ReplayTransactions", $"Txn time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Calculated delay: {delayMs:0.0} milliseconds. Time since recording start: {timeSinceRecodingStart.TotalSeconds:0.000}," +
+                    $" Time since playback start: {timeSincePlaybackStart.TotalSeconds:0.000}");
+
+                // Apply the delay if it is 1ms or more, otherwise do not wait
+                if (delayMs >= 1)
+                    await Task.Delay(delayMs);
+
                 // Send the request to the target device and wait for a response
                 await client.SendAsync(request).ContinueWith(async responseTask =>
                 {
@@ -569,6 +572,13 @@
                     {
                         var response = await responseTask;
                         string responseString = await response.Content.ReadAsStringAsync();
+
+                        // Handle long ImageArray responses by replacing the response string with a placeholder message
+                        if (methodName.Contains("ImageArray", StringComparison.OrdinalIgnoreCase) & responseString.Length > 1000)
+                        {
+                            responseString = Globals.IMAGEBYTES_PROXY_RESPONSE;
+                        }
+
                         string formattedString = responseString;
 
                         // Pretty-print the device's current response
@@ -688,6 +698,8 @@
                     }
                 });
 
+                transactionNumber++;
+
                 // End of processing this transaction - Exit if cancellation is requested
                 if (State.CancellationToken.IsCancellationRequested)
                 {
@@ -695,13 +707,15 @@
                     break;
                 }
             }
+            Logger.Newlines(1);
 
             // All transactions have been processed - report any mis-matches
+            Logger.LogMessage("Summary", "Summary");
             int mismatchCount = Mismatches.Count;
             if (mismatchCount > 0) // 1 or more mis-matches found
             {
                 // Log the number of mismatches found
-                Logger.LogMessage("", $"There {(mismatchCount == 1 ? "was" : "were")} {mismatchCount} mismatch{(mismatchCount == 1 ? "" : "es")} including:");
+                Logger.LogMessage("", $"Overall {mismatchCount} out of {transactions.Count} transactions had {(mismatchCount == 1 ? "a different outcome" : "different outcomes")} resulting in:");
 
                 // Count the total number of Mismatch objects across all summaries that have each possible message
                 foreach (string message in ReplayMismatchMessages)
@@ -722,9 +736,9 @@
                     }
 
                     // Log the outcome
-                    Logger.LogMessage("ReplayTransactions", $"    {messageCount} \"{message}\" message{(messageCount == 1 ? "" : "s")}.");
+                    Logger.LogMessage("ReplayTransactions", $"    {messageCount} \"{message}\" mismatch{(messageCount == 1 ? "" : "es")}.");
                 }
-                Logger.Newlines(1);
+                Logger.Newlines(2);
 
                 // List any mismatches
                 int issueCount = 1;
