@@ -3,6 +3,7 @@
 @using ASCOM.Common
 @using System.Text.Json
 @using System.Text.RegularExpressions
+@using System.Linq
 
 @inject FileBrowserService Browser
 @inject NavigationManager Navigation
@@ -168,7 +169,7 @@
                       Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDocuments"
                       Style="margin-left:8px; border-radius:20px; text-transform:none;" />
-        <RadzenButton Text="Disks"
+        <RadzenButton Text=@(OperatingSystem.IsWindows() ? "Disks" : "Root")
                       Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDisks"
                       Style="margin-left:8px; border-radius:20px; text-transform:none;" />
@@ -183,7 +184,7 @@
         </span>
 
         <span class="breadcrumb" style="margin-top:12px;">
-            @foreach (var part in BreadcrumbParts)
+            @foreach (Crumb? part in BreadcrumbParts)
             {
                 <span class="crumb" @onclick="() => NavigateTo(part.FullPath)">
                     @part.Name
@@ -208,7 +209,7 @@
         <div class="directory-tree">
             @if (baseIsDisks)
             {
-                @foreach (var drive in DriveInfo.GetDrives())
+                @foreach (DriveInfo? drive in DriveInfo.GetDrives().OrderBy(d => d.Name))
                 {
                     var drivePath = drive.Name;
                     <div class="tree-node">
@@ -290,7 +291,7 @@
     static readonly string[] ReplayMismatchMessages = { VALUES_DIFFERENT_MESSAGE, ELEMENT_MISSING_IN_ONE_RESPONSE, ELEMENT_MISSING_IN_BOTH_RESPONSES };
 
     // Define the list of properties to compare between the original recording and the current device response
-    static readonly string[] RESPONSE_PROPERTIES_TO_COMARE = { "Value", "ErrorNumber", "ErrorMessage" };
+    static readonly string[] RESPONSE_PROPERTIES_TO_COMARE = { "Value", "ClientTransactionID", "ErrorNumber", "ErrorMessage" };
 
     // Define a variable to hold data on any mis-matches between the original recording and current device behaviour
     List<MismatchSummary> Mismatches = new();
@@ -796,9 +797,10 @@
         var key = NormalizePath(path);
         if (!dirCache.TryGetValue(key, out var list))
         {
-            var raw = Browser.GetDirectories(path)?.ToList() ?? new List<string>();
+            List<string> raw = Browser.GetDirectories(path)?.ToList() ?? new List<string>();
             // normalize child paths for consistency
             list = raw.Select(d => NormalizePath(d)).ToList();
+            list = list.OrderBy(d => d).ToList(); // Sort for consistent display
             dirCache[key] = list;
         }
         return dirCache[key];
@@ -860,9 +862,10 @@
         State.ReplaySelectedFileFullName = null;
 
         // Select the first drive if present
-        var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
+        DriveInfo? firstDrive = DriveInfo.GetDrives().OrderBy(d => d.Name).FirstOrDefault();
         if (firstDrive != null && Directory.Exists(firstDrive.Name))
         {
+            Logger.LogDebug("ShowDisks", $"Selecting first drive: {firstDrive.Name}");
             SelectPath(firstDrive.Name);
         }
     }
@@ -933,14 +936,16 @@
     {
         if (Directory.Exists(path))
         {
+            Logger.LogDebug("SelectPath", $"Selected path: {path}");
             SelectedPath = path;
             BuildBreadcrumb(path);
 
             Files = new List<System.IO.FileInfo>();
-            foreach (var f in Browser.GetFiles(path))
+            foreach (string? f in Browser.GetFiles(path))
             {
                 if (f != null && f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                 {
+                    Logger.LogDebug("SelectPath", $"Found JSON file: {f}");
                     Files.Add(new System.IO.FileInfo(f));
                 }
             }
@@ -1111,17 +1116,23 @@
     {
         BreadcrumbParts.Clear();
 
+        Logger.LogDebug("BuildBreadcrumb", $"Building breadcrumb for path: {path}");
+
         var parts = path.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
 
         string current = Path.GetPathRoot(path) ?? "";
+        Logger.LogDebug("BuildBreadcrumb", $"Current: {current}");
 
         BreadcrumbParts.Add(new Crumb(current, current));
 
-        foreach (var part in parts.Skip(1))
+        foreach (string? part in parts.Skip(1))
         {
-            current = Path.Combine(current, part);
-            BreadcrumbParts.Add(new Crumb(part, current));
+            current = Path.Combine(current, part ?? "");
+            BreadcrumbParts.Add(new Crumb(part ?? "", current));
+            Logger.LogDebug("BuildBreadcrumb", $"Added part: {part ?? ""}, {current}");
         }
+
+        BreadcrumbParts = BreadcrumbParts.OrderBy(c => c.Name).ToList();
     }
 
     /// <summary>
