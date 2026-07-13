@@ -4,9 +4,15 @@ set -e
 # ------------------------------
 # CONFIGURATION
 # ------------------------------
-REPO_URL="https://github.com/ASCOMInitiative/AlpacaSpy.git"
-WORKDIR="/mnt/j/AlpacaSpy/publish"
-PROJECT=""   # leave empty to auto-detect .sln or .csproj
+APPLICATIONNAME="alpacaspy" # Must be lower case!
+APPLICATIONFOLDER="/mnt/j/AlpacaSpy"
+TARFOLDER="$APPLICATIONFOLDER/publish"
+PROJECT="$APPLICATIONFOLDER/AlpacaSpy/AlpacaSpy.csproj"
+
+# ------------------------------
+# CALCULATED VARIABLES
+# ------------------------------
+WORKDIR="/home/peter/$APPLICATIONNAME"
 
 # ------------------------------
 # PREPARE WORKDIR
@@ -15,31 +21,7 @@ echo "Preparing working directory: $WORKDIR"
 rm -rf "$WORKDIR"
 mkdir -p "$WORKDIR"
 
-# ------------------------------
-# CLONE REPOSITORY
-# ------------------------------
-echo "Cloning repository..."
-git clone "$REPO_URL" "$WORKDIR"
-
 cd "$WORKDIR"
-
-# ------------------------------
-# AUTO-DETECT PROJECT FILE
-# ------------------------------
-if [ -z "$PROJECT" ]; then
-    # Prefer .sln if present
-    SLN=$(find . -maxdepth 2 -name "*.sln" | head -n 1)
-    CSPROJ=$(find . -maxdepth 2 -name "*.csproj" | head -n 1)
-
-    if [ -n "$SLN" ]; then
-        PROJECT="$SLN"
-    elif [ -n "$CSPROJ" ]; then
-        PROJECT="$CSPROJ"
-    else
-        echo "ERROR: No .sln or .csproj found."
-        exit 1
-    fi
-fi
 
 echo "Using project: $PROJECT"
 
@@ -54,6 +36,8 @@ dotnet build "$PROJECT" -c Release
 
 # ------------------------------
 # PUBLISH TARGETS
+#     "linux-arm"
+#    "linux-arm64"
 # ------------------------------
 RIDS=(
     "linux-x64"
@@ -61,15 +45,38 @@ RIDS=(
     "linux-arm64"
 )
 
+echo "Making $TARFOLDER"    
+rm -rf "$TARFOLDER"
+mkdir -p "$TARFOLDER"
+
+mkdir -p "$WORKDIR/publish"
+
 for RID in "${RIDS[@]}"; do
     OUTDIR="$WORKDIR/publish-$RID"
-    echo "Publishing for $RID -> $OUTDIR"
-
+    echo "Publish folder: $OUTDIR"    
+    mkdir "$OUTDIR"
+    
+    TARFILE="$WORKDIR/publish/$APPLICATIONNAME.$RID.tar.xz"
+    echo "Tar file: $TARFILE"    
+    
     dotnet publish "$PROJECT" \
         -c Release \
         -r "$RID" \
         --self-contained true \
+        -p:PublishTrimmed=false \
+        -p:PublishSingleFile=true \
+        -p:PublishReadyToRunShowWarnings=true \
+        -p:UseAppHost=true \
         -o "$OUTDIR"
+
+    cd "$OUTDIR"
+    
+    echo "Starting tar..."
+    time tar --create --verbose --xz --file="$TARFILE" *
+    echo "Completed tar"
+
 done
+
+cp -f "$WORKDIR/publish/"* "$TARFOLDER"
 
 echo "All builds complete."
