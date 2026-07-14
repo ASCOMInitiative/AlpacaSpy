@@ -75,14 +75,14 @@ else
         <div style="flex:6"></div>
 
         <div style="color:white;display:flex;justify-content:center;font-weight:bold;margin-top:0px;margin-bottom:0px;">Application</div>
-        <div style="margin-top:3px;margin-bottom:12px;display:flex;justify-content:center;" @onclick:stopPropagation>
+        <div style="margin-top:3px;margin-bottom:12px;display:flex;justify-content:center;">
             <RadzenButton Click="RestartApplicationAsync"
                           Text="Restart"
                           Style="width:165px;margin-left:0px; margin-right:0px; border-radius:20px; text-transform:none;"
                           ButtonStyle="ButtonStyle.Warning"
                           Disabled="@(state.OperationUnderway)" />
         </div>
-        <div style="margin-top:0px;margin-bottom:12px;display:flex;justify-content:center;" @onclick:stopPropagation>
+        <div style="margin-top:0px;margin-bottom:12px;display:flex;justify-content:center;">
             <RadzenButton Click="ShutdownApplicationAsync"
                           Text="Shutdown"
                           Style="width:165px;margin-left:0px; margin-right:0px; border-radius:20px; text-transform:none;"
@@ -144,6 +144,7 @@ else
 
     private async Task RestartApplicationAsync()
     {
+        logger.LogMessage("Restart", "Application restart requested by user.");
         bool? confirmed = await DialogService.Confirm(
             "Restart the application?",
             "Confirm Restart",
