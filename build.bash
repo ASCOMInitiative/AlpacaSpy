@@ -2,36 +2,52 @@
 set -e
 
 # ------------------------------
-# CONFIGURATION
+# CONSTANTS
 # ------------------------------
-APPLICATIONNAME="alpacaspy" # Must be lower case!
-APPLICATIONFOLDER="/mnt/j/AlpacaSpy"
-TARFOLDER="$APPLICATIONFOLDER/publish"
-PROJECT="$APPLICATIONFOLDER/AlpacaSpy/AlpacaSpy.csproj"
+HOME="/home/peter" # Root folder on the WSL file system
 
 # ------------------------------
-# CALCULATED VARIABLES
+# CONFIGURATION
 # ------------------------------
-WORKDIR="/home/peter/$APPLICATIONNAME"
+REPO_URL="https://github.com/ASCOMInitiative/AlpacaSpy.git"
+
+# Linux file system
+APPLICATIONNAME="alpacaspy" # Must be lower case!
+ROOTFOLDER="$HOME/$APPLICATIONNAME"
+CHECKOUTFOLDER="$ROOTFOLDER/checkout"
+PUBLISHWORKFOLDER="$ROOTFOLDER/publishwork"
+PROJECT="$CHECKOUTFOLDER/AlpacaSpy/AlpacaSpy.csproj" # Name and location of the project file to be built
+
+# Windows file system
+WINDOWSPROJECTFOLDER="/mnt/j/AlpacaSpy" # Location where the solution / project code is located
+WINDOWSTARFOLDER="$WINDOWSPROJECTFOLDER/publish" # Location on the Windows file system to which the TAR files will be copied
 
 # ------------------------------
 # PREPARE WORKDIR
 # ------------------------------
-echo "Preparing working directory: $WORKDIR"
-rm -rf "$WORKDIR"
-mkdir -p "$WORKDIR"
+echo "Preparing work directories: $CHECKOUTFOLDER and $PUBLISHWORKFOLDER"
+rm -rf "$CHECKOUTFOLDER"
+mkdir -p "$CHECKOUTFOLDER"
+rm -rf "$PUBLISHWORKFOLDER"
+mkdir -p "$PUBLISHWORKFOLDER"
 
-cd "$WORKDIR"
+cd "$CHECKOUTFOLDER"
 
-echo "Using project: $PROJECT"
+echo "Publishing project: $PROJECT"
+
+# ------------------------------
+# CLONE REPOSITORY
+# ------------------------------
+echo "Cloning repository..."
+git clone "$REPO_URL" "$CHECKOUTFOLDER"
 
 # ------------------------------
 # RESTORE & BUILD
 # ------------------------------
-echo "Restoring..."
+echo "Restoring packages..."
 dotnet restore "$PROJECT"
 
-echo "Building..."
+echo "Building project..."
 dotnet build "$PROJECT" -c Release
 
 # ------------------------------
@@ -45,18 +61,12 @@ RIDS=(
     "linux-arm64"
 )
 
-echo "Making $TARFOLDER"    
-rm -rf "$TARFOLDER"
-mkdir -p "$TARFOLDER"
-
-mkdir -p "$WORKDIR/publish"
-
 for RID in "${RIDS[@]}"; do
-    OUTDIR="$WORKDIR/publish-$RID"
+    OUTDIR="$PUBLISHWORKFOLDER/publish-$RID"
     echo "Publish folder: $OUTDIR"    
     mkdir "$OUTDIR"
     
-    TARFILE="$WORKDIR/publish/$APPLICATIONNAME.$RID.tar.xz"
+    TARFILE="$PUBLISHWORKFOLDER/$APPLICATIONNAME.$RID.tar.xz"
     echo "Tar file: $TARFILE"    
     
     dotnet publish "$PROJECT" \
@@ -77,6 +87,6 @@ for RID in "${RIDS[@]}"; do
 
 done
 
-cp -f "$WORKDIR/publish/"* "$TARFOLDER"
+cp -f "$PUBLISHWORKFOLDER"/*.xz "$WINDOWSTARFOLDER"
 
 echo "All builds complete."

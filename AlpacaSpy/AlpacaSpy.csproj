@@ -11,7 +11,10 @@
       <InfoVersion>$(ProductMajor).$(ProductMinor).$(ProductPatch)$(ProductPreReleaseSeparator)$(ProductPreRelease)+$(BuildNumber)</InfoVersion>
     </PropertyGroup>
 
-    <WriteLinesToFile File="$(PublishDir)..\InformationVersion.txt" Overwrite="true" Lines="$(InfoVersion)" />
+    <WriteLinesToFile
+      File="$([System.IO.Path]::Combine('$(PublishDir)', '..', 'InformationVersion.txt'))"
+      Overwrite="true"
+      Lines="$(InfoVersion)" />
   </Target>
 
   <PropertyGroup>
@@ -63,7 +66,7 @@
     <ProductName>ASCOM AlpacaSpy</ProductName>
     <Company>ASCOM Initiative</Company>
     <Copyright>© Peter Simpson 2026</Copyright>
-    
+
     <Version>$(ProductMajor).$(ProductMinor).$(ProductPatch).$(BuildNumber)</Version>
     <AssemblyVersion>$(ProductMajor).$(ProductMinor).$(ProductPatch).$(BuildNumber)</AssemblyVersion>
     <FileVersion>$(ProductMajor).$(ProductMinor).$(ProductPatch).$(BuildNumber)</FileVersion>
