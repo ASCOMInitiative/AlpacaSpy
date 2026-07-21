@@ -44,8 +44,6 @@ namespace AlpacaSpy
             if (args?.Any(str => str.Contains("--local-address")) ?? false)
                 Console.WriteLine($"http://localhost:{settings.ServerPort}");
 
-            logger.LogBlankLine();
-
             Mutex? singleInstanceMutex = null;
             bool ownsSingleInstanceMutex = false;
 

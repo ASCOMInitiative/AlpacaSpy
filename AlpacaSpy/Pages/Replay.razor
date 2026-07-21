@@ -347,7 +347,7 @@
             var totalTransactions = 0;
 
             // Determine the device type of the recorded file by opening it as a JSON document and extracting the device type from first URL entry
-            Logger.LogMessage("ReplayTransactions", $"Starting initial parse");
+            Logger.LogMessage("ReplayTransactions", $"Parsing JSON file {selectedFile}");
             using (FileStream? countStream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read)) // Open the file as a file stream
             using (var jsonDocument = await JsonDocument.ParseAsync(countStream)) // Read the file as a JSON document
             {
@@ -418,7 +418,7 @@
                     return;
                 }
             }
-            Logger.LogDebug("ReplayTransactions", $"Completed initial parse");
+            Logger.LogDebug("ReplayTransactions", $"Completed initial JSON file parse");
 
             // Now read in the file as an array of AlpacaTransactions
             using (FileStream? readFilestream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -458,7 +458,7 @@
             Navigation.NavigateTo("/");
 
             // Notify what we are doing
-            Logger.LogMessage("ReplayTransactions", $"Replaying {transactions.Count} transactions from: {selectedFile} Target device type: {State.ReplayTargetDevice?.DeviceType}");
+            Logger.LogMessage("ReplayTransactions", $"Replaying {transactions.Count} transactions, Target device type: {State.ReplayTargetDevice?.DeviceType}");
 
             // Create an HTTP client to send commands to the selected device
             HttpClient client = HttpClientFactory.CreateClient();
