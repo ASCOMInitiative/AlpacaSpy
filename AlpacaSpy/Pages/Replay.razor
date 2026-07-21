@@ -34,7 +34,7 @@
         align-items: flex-start;
     }
 
-    .breadcrumb-bar {
+    .buttons {
         width: 100%;
         margin-bottom: 12px;
     }
@@ -88,8 +88,8 @@
 
     .file-list-box {
         /* Render as a fixed right-hand column next to the directory tree */
-        flex: 0 0 340px;
-        width: 340px;
+        flex: 0 0 450px;
+        width: 450px;
         /* ensure it never exceeds viewport height */
         max-height: calc(100vh - 24px);
         overflow: auto;
@@ -132,6 +132,7 @@
 
 <h4>Select Target Device</h4>
 
+<!-- Target device list -->
 <div class="target-device-list">
     @if (State.ConfiguredDevices != null && State.ConfiguredDevices.Any())
     {
@@ -149,18 +150,26 @@
     }
 </div>
 
+<!-- Target device must be selected warning message -->
+@if (State.ReplayTargetDevice is null)
+{
+    <div style="color:red;font-size:large;font-weight:bold;margin-top:24px;">The target device must be set before the replay file can be selected.</div>
+}
+
+
+<!-- Select replay header -->
 <div class="title-row" style="margin-top:36px;">
-    <h4 style="margin-bottom:24px;"> Select Replay File</h4>
-    @if (State.ReplayTargetDevice is null)
-    {
-        <span class="right-text" style="color:red">(Select target device first)</span>
-    }
+    <h4> Select Replay File</h4>
 </div>
 
+<!-- Spacer -->
+<div style="margin-bottom:24px;" />
+
+<!-- Select replay file dialogue -->
 <div class="file-browser">
 
-    <!-- Breadcrumb + Buttons -->
-    <div class="breadcrumb-bar">
+    <!-- Buttons -->
+    <div class="buttons">
         <RadzenButton Text="⬆ Up one level"
                       Click="@GoUpOneLevel"
                       Style="border-radius:20px; text-transform:none;"
@@ -179,16 +188,19 @@
                       Style="margin-left:8px; border-radius:20px; text-transform:none;" />
         <span style="margin-left:48px;min-width:205px;">
             <RadzenCheckBox Value="Settings.PlaybackExpandJson"
+                            Disabled="@(State.ReplayTargetDevice is null )"
                             ValueChanged="@((bool v) => { Settings.PlaybackExpandJson = v;})" />
             <label>Pretty-print JSON on playback.</label>
         </span>
     </div>
 
-    <!-- Leave a gap between the buttons and the folder list -->
+    <!-- Gap between buttons and folder list -->
     <div style="margin-bottom:36px;" />
 
-    <!-- Directory Tree -->
+    <!-- Directory tree and file list -->
     <div class="file-browser-content" style="display:@(State.ReplayTargetDevice is null ? "none" : "flex")">
+
+        <!-- Directory tree -->
         <div class="directory-tree">
             @if (baseIsDisks)
             {
@@ -240,7 +252,7 @@
             @if (Files != null && Files.Any())
             {
                 <div class="file-checklist">
-                    @foreach (var file in Files)
+                    @foreach (var file in Files.Where((x) => State.ReplayTargetDevice != null && x.FullName.Contains(State.ReplayTargetDevice.DeviceType.ToString(), StringComparison.OrdinalIgnoreCase)))
                     {
                         <div class="file-item">
                             <input type="radio" name="jsonFiles" checked="@(State.ReplaySelectedFileFullName == file.FullName)" @onchange="@(e => OnFileRadioChanged(file.FullName, e))" />
@@ -248,14 +260,16 @@
                         </div>
                     }
                 </div>
-                <div style="margin-top:8px; text-align:right;">
-                    <RadzenButton Text="Replay Transactions"
-                                  Click="@ReplayTransactions"
-                                  Style="margin-left:8px; border-radius:20px; text-transform:none;"
-                                  Disabled="@(string.IsNullOrEmpty(State.ReplaySelectedFileFullName))" />
-                    <div style="margin-top:8px;">
-                        <RadzenProgressBar @bind-Value="@replayProgress" AriaLabel="Replay Progress" Style="width:240px;" />
-                    </div>
+                <div style="margin-top:8px; text-align:right; display:flex; justify-content:flex-end; align-items:center; gap:8px;">
+                    <span style="width:240px; display:inline-flex; align-items:center;">
+                        <RadzenProgressBar @bind-Value="@replayProgress" AriaLabel="Replay Progress" Style="width:230px;" />
+                    </span>
+                    <span>
+                        <RadzenButton Text="Replay Transactions"
+                                      Click="@ReplayTransactions"
+                                      Style="border-radius:20px;margin-right:6px;"
+                                      Disabled="@(string.IsNullOrEmpty(State.ReplaySelectedFileFullName))" />
+                    </span>
                 </div>
             }
             else
@@ -281,10 +295,6 @@
 
     string? SelectedPath;
     List<System.IO.FileInfo> Files = new();
-
-    // File path breadcrumb parts, each with a display name and full path for navigation
-    record Crumb(string Name, string FullPath);
-    List<Crumb> BreadcrumbParts = new();
 
     // Directory tree helpers
     Dictionary<string, List<string>> dirCache = new();
@@ -921,7 +931,6 @@
         {
             Logger.LogDebug("SelectPath", $"Selected path: {path}");
             SelectedPath = path;
-            BuildBreadcrumb(path);
 
             Files = new List<System.IO.FileInfo>();
             foreach (string? f in Browser.GetFiles(path))
@@ -1092,40 +1101,12 @@
     };
 
     /// <summary>
-    /// Build the breadcrumb parts for the given <paramref name="path"/>.
-    /// </summary>
-    /// <param name="path">The path for which to build the breadcrumb.</param>
-    void BuildBreadcrumb(string path)
-    {
-        BreadcrumbParts.Clear();
-
-        Logger.LogDebug("BuildBreadcrumb", $"Building breadcrumb for path: {path}");
-
-        var parts = path.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
-
-        string current = Path.GetPathRoot(path) ?? "";
-        Logger.LogDebug("BuildBreadcrumb", $"Current: {current}");
-
-        BreadcrumbParts.Add(new Crumb(current, current));
-
-        foreach (string? part in parts.Skip(1))
-        {
-            current = Path.Combine(current, part ?? "");
-            BreadcrumbParts.Add(new Crumb(part ?? "", current));
-            Logger.LogDebug("BuildBreadcrumb", $"Added part: {part ?? ""}, {current}");
-        }
-
-        BreadcrumbParts = BreadcrumbParts.OrderBy(c => c.Name).ToList();
-    }
-
-    /// <summary>
     /// Navigates to the specified path, updating the selected path, breadcrumb, and file list.
     /// </summary>
     /// <param name="path">The path to navigate to.</param>
     void NavigateTo(string path)
     {
         SelectedPath = path;
-        BuildBreadcrumb(path);
 
         Files = new List<System.IO.FileInfo>
         ();
