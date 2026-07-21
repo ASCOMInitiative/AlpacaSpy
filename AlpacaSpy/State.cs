@@ -52,6 +52,8 @@ namespace AlpacaSpy
 
         public string? ReplaySelectedFileFullName { get; set; } = null; // Currently selected file for replay (full path); null = none selected
 
+        public List<FileInfo> ReplayJsonFiles { get; set; } = new();
+
         public List<object> ProxyDevices { get; set; } = new();
 
         /// <summary>Per-device TraceLogger instances keyed by ConfiguredDevice.UniqueId.</summary>

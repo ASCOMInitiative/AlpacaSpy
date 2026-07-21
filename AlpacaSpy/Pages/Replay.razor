@@ -153,7 +153,7 @@
 <!-- Target device must be selected warning message -->
 @if (State.ReplayTargetDevice is null)
 {
-    <div style="color:red;font-size:large;font-weight:bold;margin-top:24px;">The target device must be set before the replay file can be selected.</div>
+    <div style="color:red;font-size:large;font-weight:bold;margin-top:24px;">A target device must be set before a replay file can be selected.</div>
 }
 
 
@@ -249,10 +249,10 @@
         <div class="file-list-box">
             <h3><b>JSON files</b></h3>
             <div class="path">@(SelectedPath is null ? "No folder selected" : "")</div>
-            @if (Files != null && Files.Any())
+            @if (State.ReplayJsonFiles != null && State.ReplayJsonFiles.Any())
             {
                 <div class="file-checklist">
-                    @foreach (var file in Files.Where((x) => State.ReplayTargetDevice != null && x.FullName.Contains(State.ReplayTargetDevice.DeviceType.ToString(), StringComparison.OrdinalIgnoreCase)))
+                    @foreach (var file in State.ReplayJsonFiles)
                     {
                         <div class="file-item">
                             <input type="radio" name="jsonFiles" checked="@(State.ReplaySelectedFileFullName == file.FullName)" @onchange="@(e => OnFileRadioChanged(file.FullName, e))" />
@@ -274,7 +274,7 @@
             }
             else
             {
-                <div class="empty">No JSON files</div>
+                <div class="empty">No @(State.ReplayTargetDevice is not null?  State.ReplayTargetDevice.DeviceType:"") JSON files</div>
             }
         </div>
     </div>
@@ -294,7 +294,6 @@
     List<MismatchSummary> Mismatches = new();
 
     string? SelectedPath;
-    List<System.IO.FileInfo> Files = new();
 
     // Directory tree helpers
     Dictionary<string, List<string>> dirCache = new();
@@ -814,6 +813,8 @@
     void SelectTargetDevice(AlpacaSpy.Models.ConfiguredDevice device)
     {
         State.ReplayTargetDevice = device;
+        if (SelectedPath is not null)
+            NavigateTo(SelectedPath);
     }
 
     /// <summary>
@@ -932,13 +933,16 @@
             Logger.LogDebug("SelectPath", $"Selected path: {path}");
             SelectedPath = path;
 
-            Files = new List<System.IO.FileInfo>();
-            foreach (string? f in Browser.GetFiles(path))
+            State.ReplayJsonFiles = new List<System.IO.FileInfo>();
+            foreach (string? fileName in Browser.GetFiles(path))
             {
-                if (f != null && f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                if (fileName != null &&
+                    fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
+                    State.ReplayTargetDevice is not null &&
+                    fileName.Contains(State.ReplayTargetDevice.DeviceType.ToString(), StringComparison.OrdinalIgnoreCase))
                 {
-                    Logger.LogDebug("SelectPath", $"Found JSON file: {f}");
-                    Files.Add(new System.IO.FileInfo(f));
+                    Logger.LogDebug("SelectPath", $"Found JSON file: {fileName}");
+                    State.ReplayJsonFiles.Add(new System.IO.FileInfo(fileName));
                 }
             }
         }
@@ -1108,13 +1112,16 @@
     {
         SelectedPath = path;
 
-        Files = new List<System.IO.FileInfo>
+        State.ReplayJsonFiles = new List<System.IO.FileInfo>
         ();
-        foreach (var f in Browser.GetFiles(path))
+        foreach (string fileName in Browser.GetFiles(path))
         {
-            if (f != null && f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            if (fileName != null &&
+                fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
+                State.ReplayTargetDevice is not null &&
+                fileName.Contains(State.ReplayTargetDevice.DeviceType.ToString(), StringComparison.OrdinalIgnoreCase))
             {
-                Files.Add(new System.IO.FileInfo(f));
+                State.ReplayJsonFiles.Add(new System.IO.FileInfo(fileName));
             }
         }
 
