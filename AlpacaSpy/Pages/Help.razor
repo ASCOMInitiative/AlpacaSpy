@@ -12,7 +12,119 @@
 
 <PageTitle>@Globals.APPLICATION_NAME - Help</PageTitle>
 
-<h3>Help</h3>
+<h2 style="margin-top:0px;">Introduction</h2>
+<p>
+    Analysing Alpaca client and device logs when debugging issues can be challenging due to differences in logging styles and completeness of logs. @Globals.APPLICATION_NAME
+    aims to improve this by providing a mechanic to log commands and responses between an Alpaca client and a device.
+</p>
+<p>
+    @Globals.APPLICATION_NAME is a cross-platform Blazor application with implementations for Windows, Linux x64, Linux Arm32, Linux Arm64 and MacOS. Its UI is delivered through the default browser.
+</p>
+
+<h2 style="margin-top:24px;">Capabilities</h2>
+@Globals.APPLICATION_NAME can:
+<ul>
+    <li>Act as a transparent intermediary between an Alpaca client and an Alpaca device that logs commands and responses for later analysis and debugging.</li>
+    <li>Optionally record client commands for replay to the device at a later time to aid behavioural debugging.</li>
+    <li>Compare device responses during playback with those originally recorded.</li>
+    <li>Monitor many Alpaca connections simultaneously.</li>
+    <li>Can run "headless" i.e. does not require a browser UI to be connected.</li>
+</ul>
+
+<p>
+    A core set of information is always logged for each transaction including
+</p>
+<ul>
+    <li>The HTTP method.</li>
+    <li>The ASCOM interface member being called.</li>
+    <li>All client parameters</li>
+    <li>The response HTTP status code.</li>
+    <li>The JSON response in compact form when the HTTP response code is 200 OK.</li>
+    <li>The text error message when the HTTP response code is not 200 OK.</li>
+</ul>
+
+<h2 style="margin-top:24px;">How to use @Globals.APPLICATION_NAME</h2>
+<p>
+    To insert @Globals.APPLICATION_SHORT_NAME between a client and a device:,
+</p>
+<ul>
+    <li>Add the target device as a proxied device using the Setup page.</li>
+    <li>Restart @Globals.APPLICATION_SHORT_NAME and ensure that the home page log says that the device is connected.</li>
+    <li>
+        Select the @Globals.APPLICATION_SHORT_NAME proxied device through the client's Alpaca Discovery or other device selection mechanic.
+        The proxied device will appear with the device's normal name prefixed by with the text: "@Globals.APPLICATION_SHORT_NAME -".
+    </li>
+    <li>Client commands and device responses will appear on the @Globals.APPLICATION_SHORT_NAME home page and be recorded in the AlpacaSpy logs.</li>
+</ul>
+
+<h2 style="margin-top:24px;">Navigation</h2>
+<p>
+    The navigation area to the left of the screen provides access to:
+</p>
+<ul>
+    <li>Links to the Record, Playback and Setup pages.</li>
+    <li>A button to Connect to / Disconnect from devices. (This is a "click - on, click - off" button.)</li>
+    <li>Buttons to restart or shut down @Globals.APPLICATION_NAME.</li>
+</ul>
+
+<h2 style="margin-top:24px;">Setup Page</h2>
+<h4>Adding a device</h4>
+<p>
+    In order to reduce screen clutter, by default, available Alpaca devices are not displayed on the Setup page. To add a device to @Globals.APPLICATION_SHORT_NAME:
+</p>
+<ul>
+    <li>Ensure the Device State is: Disconnected.</li>
+    <li>Click the Discover and select ALpaca devices button.</li>
+    <li>Click the Add button for each device you want to include. This will add a device tab to the Settings section below.</li>
+    <li>COnfigure the device settings if required.</li>
+    <li>Restart @Globals.APPLICATION_SHORT_NAME, after which the device can be selected by the client application.</li>
+</ul>
+
+<h4>General Settings</h4>
+There are cross-cutting settings for @Globals.APPLICATION_SHORT_NAME as a whole:
+<ul>
+    <li>Whether or not to connect to configured devices at startup.</li>
+    <li>The IP port on which to operate (default 32325)</li>
+    <li>The log level (Information / Debug etc.)</li>
+    <li>The discovery response Location.</li>
+    <li>Whether to log discovery diagnostics (not normally required).</li>
+    <li>Whether to start a UI browser session when the application starts.</li>
+    <li>The length of time to wait for devices to respond during discovery.</li>
+    <li>The time before GET commands to the device time out.</li>
+    <li>The time to wait for devices to connect.</li>
+    <li>Whether to include debug trace information for communications with the device.</li>
+    <li>Whether to bind to all network addresses or only to localhost.</li>
+    <li>Whether to respond to Alpaca Discovery requests.</li>
+    <li>Whether to respond to discovery requests on all network addresses or only localhost.</li>
+    <li>Whether to accept incorrectly cased JSON responses from the device.</li>
+    <li>The maximum number of client/device transactions to store for each configured device.</li>
+</ul>
+
+<h4>Device Settings</h4>
+<p>
+    In addition to the core data, the following items can optionally be logged:
+</p>
+<ul>
+    <li>Client headers sent to the device.</li>
+    <li>Parameter names and values sent to the device.</li>
+    <li>Headers send by the device to the client.</li>
+    <li>Pretty-printed form of the JSON response sent by the device to the client.</li>
+</ul>
+
+<h2 style="margin-top:24px;">Notes</h2>
+<h4>Playback</h4>
+<p>
+    Slight timing differences between recording and playback may result in differences being reported in completion and status variables responses.
+    E.g. an asynchronous operation may complete slightly earlier or later on playback and completion variables such as "Telescope.Slewing" or status variables
+    such as "CoverCalibrator.CoverState" may consequently report spurious differences that can be ignored.
+</p>
+
+<h4>Headless Running</h4>
+<p>
+    The @Globals.APPLICATION_SHORT_NAME executable will continue to run after all browser sessions are terminated. The best way to terminate the application 
+    is by connecting a browser to the @Globals.APPLICATION_SHORT_NAME IP port (default @Globals.DEFAULT_ALPACA_PORT) and using the Shutdown button in the Navigation pane. 
+    Alternatively, the "@Globals.APPLICATION_NAME" process can be terminated through Task Manager.
+</p>
 
 @code {
     public ValueTask DisposeAsync()

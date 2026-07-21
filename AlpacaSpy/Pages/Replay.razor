@@ -150,7 +150,7 @@
 </div>
 
 <div class="title-row" style="margin-top:36px;">
-    <h4>Select Replay File</h4>
+    <h4 style="margin-bottom:24px;"> Select Replay File</h4>
     @if (State.ReplayTargetDevice is null)
     {
         <span class="right-text" style="color:red">(Select target device first)</span>
@@ -182,27 +182,10 @@
                             ValueChanged="@((bool v) => { Settings.PlaybackExpandJson = v;})" />
             <label>Pretty-print JSON on playback.</label>
         </span>
-
-        <span class="breadcrumb" style="margin-top:12px;">
-            @foreach (Crumb? part in BreadcrumbParts)
-            {
-                <span class="crumb" @onclick="() => NavigateTo(part.FullPath)">
-                    @part.Name
-                </span>
-                @if (part != BreadcrumbParts.Last() && part != BreadcrumbParts.First())
-                {
-                    @if (OperatingSystem.IsWindows())
-                    {
-                        <span>\</span>
-                    }
-                    else
-                    {
-                        <span>/</span>
-                    }
-                }
-            }
-        </span>
     </div>
+
+    <!-- Leave a gap between the buttons and the folder list -->
+    <div style="margin-bottom:36px;" />
 
     <!-- Directory Tree -->
     <div class="file-browser-content" style="display:@(State.ReplayTargetDevice is null ? "none" : "flex")">
