@@ -15,29 +15,6 @@ if defined __VCVARSALL_HOST_ARCH (
 cd
 cd J:\AlpacaSpy
 
-echo *** Publishing Linux builds
-wsl -e bash -lc "/mnt/j/AlpacaSpy/build.bash"
-
-echo *** Publishing MacOS Intel silicon
-dotnet publish AlpacaSpy/AlpacaSpy.csproj -c Debug -p:Platform="Any CPU" -r osx-x64  --framework net10.0 --self-contained true /p:PublishTrimmed=false -p:PublishSingleFile=true -o ./publish/Temp/AlpacaSpyOsxX64/
-rem  echo *** Creating tar file
-rem tar -cJf publish/alpacaspy.macos-x64.tar.xz -C publish/Temp/AlpacaSpyOsxX64\ *
-echo *** Completed MacOS Intel silicon
-
-echo *** Publishing MacOS Apple silicon
-dotnet publish AlpacaSpy/AlpacaSpy.csproj -c Debug -p:Platform="Any CPU" -r osx-arm64 --framework net10.0 --self-contained true /p:PublishTrimmed=false -p:PublishSingleFile=true -o ./publish/Temp/AlpacaSpyOsxArm64/
-rem echo *** Creating tar file
-rem tar -cJf publish/alpacaspy.macos-arm64.tar.xz -C publish/Temp/AlpacaSpyOsxArm64\ *
-echo *** Completed MacOS Apple silicon
-
-scp -r J:\AlpacaSpy\publish\Temp\AlpacaSpyOsxX64\* petersimpson@macmini:/Users/petersimpson/builds/AlpacaSpy/source_files/alpacaspy.macos-x64
-
-scp -r J:\AlpacaSpy\publish\Temp\AlpacaSpyOsxArm64\* petersimpson@macmini:/Users/petersimpson/builds/AlpacaSpy/source_files/alpacaspy.macos-arm64
-
-ssh -t petersimpson@macmini "sudo /Users/petersimpson/Builds/AlpacaSpy/makespy 0.9.0"
-
-scp petersimpson@macmini:/Users/petersimpson/Builds/AlpacaSpy/dmg_file/* J:\AlpacaSpy\publish
-
 echo *** Publishing Windows ARM 64bit
 dotnet publish AlpacaSpy/AlpacaSpy.csproj -c Debug /p:Platform="Any CPU" -r win-arm64 --framework net10.0 --self-contained true /p:PublishTrimmed=false /p:PublishSingleFile=true -o ./publish/Temp/AlpacaSpyArm64/
 echo *** Completed Windows ARM 64bit publish

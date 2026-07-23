@@ -171,6 +171,7 @@ namespace AlpacaSpy
                 app.Run();
 
                 // Clear the proxy devices to release any file locks before attempting restart
+                logger.LogMessage(nameof(Main), "Disposing of proxy devices and device loggers before shutdown.");
                 foreach (IDisposable device in state.ProxyDevices) try { device.Dispose(); } catch { }
                 state.ProxyDevices.Clear();
 
@@ -206,6 +207,7 @@ namespace AlpacaSpy
                         logger.LogError(nameof(Main), $"Failed to restart: {ex.Message}");
                     }
                 }
+                logger.LogMessage(nameof(Main), "Exiting application.");
             }
             finally
             {
