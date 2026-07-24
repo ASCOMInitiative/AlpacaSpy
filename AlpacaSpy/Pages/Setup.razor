@@ -217,6 +217,7 @@
                                     Data="@_consoleAppearancees"
                                     @bind-Value="settings.ConsoleAppearance"
                                     Style="width:180px;"
+                                    Disabled="@state.Connected"
                                     Change="@(() => SaveSettings())" />
                 </div>
 
