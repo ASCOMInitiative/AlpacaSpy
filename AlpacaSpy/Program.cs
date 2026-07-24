@@ -28,6 +28,25 @@ namespace AlpacaSpy
 
         public static async Task Main(string[] args)
         {
+            // Set the required type of console window
+            switch (settings.ConsoleAppearance)
+            {
+                case ConsoleAppearance.Minimized:
+                    ConsoleHider.MinimizeConsoleWindow();
+                    break;
+
+                case ConsoleAppearance.Hidden:
+                    ConsoleHider.HideConsoleWindow();
+                    break;
+
+                case ConsoleAppearance.Normal:
+                    // Do nothing, leave the console window as is
+                    break;
+
+                default:
+                    throw new ASCOM.InvalidValueException("Invalid console appearance value.");
+            }
+
             ServerVersion = state.ApplicationVersion;
 
             logger.LogMessage("Main", $"{ServerName} version {state.InformationalVersion}");
@@ -190,6 +209,14 @@ namespace AlpacaSpy
                             ownsSingleInstanceMutex = false;
                         }
 
+                        ProcessWindowStyle windowStyle = settings.ConsoleAppearance switch
+                        {
+                            ConsoleAppearance.Minimized => ProcessWindowStyle.Minimized,
+                            ConsoleAppearance.Hidden => ProcessWindowStyle.Hidden,
+                            _ => ProcessWindowStyle.Normal
+                        };
+
+
                         string? processPath = Environment.ProcessPath;
                         if (!string.IsNullOrWhiteSpace(processPath))
                         {
@@ -198,7 +225,8 @@ namespace AlpacaSpy
                             {
                                 FileName = processPath,
                                 Arguments = "--nobrowser",
-                                UseShellExecute = true
+                                UseShellExecute = true,
+                                WindowStyle = windowStyle,
                             });
                         }
                     }

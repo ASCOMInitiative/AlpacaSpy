@@ -211,6 +211,14 @@
                                    Style="width:100px;" />
                                    <span>Maximum number of recorded transactions (per device).</span>
                 </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:160px;">Console Appearance:</label>
+                    <RadzenDropDown TValue="ConsoleAppearance"
+                                    Data="@_consoleAppearancees"
+                                    @bind-Value="settings.ConsoleAppearance"
+                                    Style="width:180px;"
+                                    Change="@(() => SaveSettings())" />
+                </div>
 
             </div>
         </RadzenTabsItem>
@@ -373,6 +381,7 @@
 @code {
     private bool _discoveryRunning;
     private readonly LogLevel[] _logLevels = Enum.GetValues<LogLevel>();
+    private readonly ConsoleAppearance[] _consoleAppearancees = Enum.GetValues<ConsoleAppearance>();
 
     protected override void OnInitialized()
     {

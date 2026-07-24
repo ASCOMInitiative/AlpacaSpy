@@ -18,9 +18,12 @@ namespace AlpacaSpy
         internal const int MAXIMUM_LOG_SIZE_CHARACTERS = 120000;
         internal const int LOG_TRUNCATION_CHARACTERS = 12000;
         internal const string DISCOVERY_PACKET_MESSAGE = "Received a discovery packet from";
-        internal const int APPLICATION_SHUTDOWN_TIMEOUT = 5;
-        internal const int WEBSOCKET_CLOSE_TIMEOUT = 5;
+
+        // Shutdown is usually initiated from a live Blazor Server circuit, so keep the host and WebSocket graceful-close windows short to avoid an unnecessary pause before exit.
+        internal const int APPLICATION_SHUTDOWN_TIMEOUT = 1;
+        internal const int WEBSOCKET_CLOSE_TIMEOUT = 1;
         internal const int RESTART_DELAY = 1;
+
         internal const int DISCONNECTED_CIRCUIT_RETENTION_PERIOD = 180;
         internal const int LOG_REFRESH_INTERVAL = 250;
         internal const int MAX_CONFIGURED_DEVICES = 10;

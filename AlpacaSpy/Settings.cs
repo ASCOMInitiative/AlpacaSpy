@@ -152,6 +152,8 @@ namespace AlpacaSpy
 
         #endregion
 
+        public ConsoleAppearance ConsoleAppearance { get; set; } = ConsoleAppearance.Hidden;
+
         public List<ConfiguredDevice> ConfiguredDevices { get; set; } = new();
         public bool LogDiscoveryMessages { get; set; } = false;
         public bool StartBrowserOnLaunch { get; set; } = true;
