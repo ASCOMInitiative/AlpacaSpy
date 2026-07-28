@@ -17,9 +17,9 @@ namespace Updates
             ArgumentNullException.ThrowIfNull(name);
             ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-            var Github = new GitHubClient(new ProductHeaderValue($@"{name}-UpdateCheck"));
+            GitHubClient githubClient = new(new ProductHeaderValue($@"{name}-UpdateCheck"));
 
-            return Github.Repository.Release.GetAll(owner, name);
+            return githubClient.Repository.Release.GetAll(owner, name);
         }
 
         public static Release? LatestRelease(this IEnumerable<Release> releases)
@@ -38,11 +38,22 @@ namespace Updates
         public static Release? Latest(this IEnumerable<Release> releases)
         {
             ArgumentNullException.ThrowIfNull(releases);
-            if (releases.Any())
+
+            Release? latestRelease = null;
+            SemVersion? latestVersion = null;
+
+            foreach (Release release in releases)
             {
-                return releases.OrderBy(rp => rp.ReleaseSemVersionFromTag()).LastOrDefault();
+                SemVersion releaseVersion = release.ReleaseSemVersionFromTag();
+
+                if (latestRelease is null || latestVersion is null || SemVersion.ComparePrecedence(releaseVersion, latestVersion) > 0)
+                {
+                    latestRelease = release;
+                    latestVersion = releaseVersion;
+                }
             }
-            return null;
+
+            return latestRelease;
         }
 
         public static SemVersion ReleaseSemVersionFromTag(this Release release)
