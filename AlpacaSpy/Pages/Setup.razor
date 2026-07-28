@@ -80,8 +80,9 @@
 <h4 style="margin-top:24px;">Settings</h4>
 <RadzenTabs>
     <Tabs>
-        <RadzenTabsItem Text="Settings">
+        <RadzenTabsItem Text="Application">
             <div style="display:flex;flex-direction:column;gap:8px;max-width:800px;">
+                <h4 style="color:cornflowerblue">Application</h4>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
                                     Value="settings.AutoConnect"
@@ -102,29 +103,12 @@
                     <label>(Default 32325.)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <label style="width:160px;">Logging Level:</label>
-                    <RadzenDropDown TValue="ASCOM.Common.Interfaces.LogLevel"
-                                    Data="@_logLevels"
-                                    @bind-Value="settings.LogLevel"
-                                    Style="width:180px;"
-                                    Disabled="@state.Connected"
-                                    Change="@(() => SaveSettings())" />
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Location:</label>
                     <RadzenTextBox TValue="string"
                                    Value="@settings.Location"
                                    ValueChanged="@(async (string v) => { settings.Location = v; await SaveSettings(); })"
                                    Disabled="@state.Connected"
                                    Style="width:220px;" />
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <RadzenCheckBox TValue="bool"
-                                    Value="@settings.LogDiscoveryMessages"
-                                    ValueChanged="@(async (bool v) => { settings.LogDiscoveryMessages = v; await SaveSettings(); })"
-                                    Disabled="@state.Connected"
-                                    Name="logDiscoveryMessages" />
-                    <label>Log discovery messages</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
@@ -145,7 +129,7 @@
                     <label>(Seconds)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <label style="width:160px;">Get timeout:</label>
+                    <label style="width:160px;">HTTP Get timeout:</label>
                     <RadzenNumeric TValue="int"
                                    Value="@settings.AlpacaGetPropertyTimeout"
                                    ValueChanged="@(async (int v) => { settings.AlpacaGetPropertyTimeout = v; await SaveSettings(); })"
@@ -163,14 +147,6 @@
                                    Disabled="@state.Connected"
                                    Style="width:100px;" />
                     <label>(Seconds)</label>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <RadzenCheckBox TValue="bool"
-                                    Value="@settings.IncludeAlpacaTrace"
-                                    ValueChanged="@(async (bool v) => { settings.IncludeAlpacaTrace = v; await SaveSettings(); })"
-                                    Disabled="@state.Connected"
-                                    Name="includeAlpacaTrace" />
-                    <label>Include Alpaca debug trace information.</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
@@ -197,14 +173,6 @@
                     <label style="min-width:750px;">Send discovery responses on all network connections. (Un-check to respond only on localhost.)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <RadzenCheckBox TValue="bool"
-                                    Value="@settings.RunInStrictAlpacaMode"
-                                    ValueChanged="@(async (bool v) => { settings.RunInStrictAlpacaMode = v; await SaveSettings(); })"
-                                    Disabled="@state.Connected"
-                                    Name="runInStrictAlpacaMode" />
-                    <label style="min-width:750px;">Run in Alpaca strict casing mode. (Devices that fail when this is checked are not Alpaca compliant.)</label>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Transaction records:</label>
                     <RadzenNumeric TValue="int"
                                    Value="@settings.MaximumRecordingFileEntries"
@@ -224,7 +192,44 @@
                                     Disabled="@state.Connected"
                                     Change="@(() => SaveSettings())" />
                 </div>
+                <h4 style="color:cornflowerblue">Debug</h4>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:160px;">Logging Level:</label>
+                    <RadzenDropDown TValue="ASCOM.Common.Interfaces.LogLevel"
+                                    Data="@_logLevels"
+                                    @bind-Value="settings.LogLevel"
+                                    Style="width:180px;"
+                                    Disabled="@state.Connected"
+                                    Change="@(() => SaveSettings())" />
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.LogDiscoveryMessages"
+                                    ValueChanged="@(async (bool v) => { settings.LogDiscoveryMessages = v; await SaveSettings(); })"
+                                    Disabled="@state.Connected"
+                                    Name="logDiscoveryMessages" />
+                    <label>Log discovery messages</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.IncludeAlpacaTrace"
+                                    ValueChanged="@(async (bool v) => { settings.IncludeAlpacaTrace = v; await SaveSettings(); })"
+                                    Disabled="@state.Connected"
+                                    Name="includeAlpacaTrace" />
+                    <label>Include Alpaca debug trace information.</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.RunInStrictAlpacaMode"
+                                    ValueChanged="@(async (bool v) => { settings.RunInStrictAlpacaMode = v; await SaveSettings(); })"
+                                    Disabled="@state.Connected"
+                                    Name="runInStrictAlpacaMode" />
+                    <label style="min-width:750px;">Run in Alpaca strict casing mode. (Devices that fail when this is checked are not Alpaca compliant.)</label>
+                </div>
 
+            
+            
+            
             </div>
         </RadzenTabsItem>
 
@@ -260,7 +265,7 @@
                                       Size="ButtonSize.Small"
                                       Disabled="@state.Connected" />
                     </div>
-                    <strong style="margin-right:auto;">Header and parameter logging</strong>
+                    <strong style="margin-right:auto;color:cornflowerblue">Header and parameter logging</strong>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
                         <span style="min-width:205px;">
                             <RadzenCheckBox Value="device.LogClientHeaders"
@@ -289,7 +294,7 @@
                     </div>
                     <div style="margin-top:16px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-                            <strong style="margin-right:auto;">Member logging</strong>
+                            <strong style="margin-right:auto;color:cornflowerblue">Member logging</strong>
                             <RadzenButton Click="@(() => ClearAllSelected(device))"
                                           Text="Clear All"
                                           ButtonStyle="ButtonStyle.Primary"
