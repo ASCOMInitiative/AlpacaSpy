@@ -51,7 +51,7 @@ namespace AlpacaSpy
 
             logger.LogMessage("Main", $"{ServerName} version {state.InformationalVersion}");
             logger.LogMessage("Main", $"Running on: {RuntimeInformation.OSDescription}.");
-            logger.LogBlankLine();
+            logger.Newlines(1);
 
             if (args?.Any(str => str.Contains("--reset")) ?? false)
             {

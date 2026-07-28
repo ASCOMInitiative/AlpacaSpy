@@ -19,7 +19,7 @@
         @foreach (ConfiguredDevice device in state.ConfiguredDevices)
         {
             <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId" Style="--rz-tabs-tab-display: inline-flex; --rz-tabs-tab-align-items: center;">
-                <div style="border:1px solid #ccc;padding:12px;border-radius:4px;max-width:900px;">
+                <div style="border:1px solid #ccc;padding:12px;border-radius:4px;max-width:1000px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;">
                         <div style="display:flex;align-items:center;gap:12px;">
                             <span style="font-size:20px;font-weight:bold;">@device.Name</span>

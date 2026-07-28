@@ -99,6 +99,7 @@
                                    Change="@(async () => await SaveSettings())"
                                    Disabled="@state.Connected"
                                    Style="width:100px;" />
+                    <label>(Default 32325.)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Logging Level:</label>
@@ -141,6 +142,7 @@
                                    Min="1"
                                    Disabled="@state.Connected"
                                    Style="width:100px;" />
+                    <label>(Seconds)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Get timeout:</label>
@@ -150,6 +152,7 @@
                                    Min="1"
                                    Disabled="@state.Connected"
                                    Style="width:100px;" />
+                    <label>(Seconds)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Connect timeout:</label>
@@ -159,6 +162,7 @@
                                    Min="1"
                                    Disabled="@state.Connected"
                                    Style="width:100px;" />
+                    <label>(Seconds)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
@@ -174,7 +178,7 @@
                                     ValueChanged="@(async (bool v) => { settings.BindToAllNetworkAddresses = v; await SaveSettings(); })"
                                     Disabled="@state.Connected"
                                     Name="bindToAllNetworkAddresses" />
-                    <label>Bind to all network addresses</label>
+                    <label>Bind to all network addresses (Un-check to bind to localhost only.)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <RadzenCheckBox TValue="bool"
@@ -209,7 +213,7 @@
                                    Disabled="@state.Connected"
                                    Format="N0"
                                    Style="width:100px;" />
-                                   <span>Maximum number of recorded transactions (per device).</span>
+                                   <span>Maximum number of recorded transactions per device (Default 100,000).</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Console Appearance:</label>

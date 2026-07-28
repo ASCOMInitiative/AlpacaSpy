@@ -150,16 +150,15 @@
     }
 </div>
 
-<!-- Target device must be selected warning message -->
-@if (State.ReplayTargetDevice is null)
-{
-    <div style="color:red;font-size:large;font-weight:bold;margin-top:24px;">A target device must be set before a replay file can be selected.</div>
-}
-
-
 <!-- Select replay header -->
 <div class="title-row" style="margin-top:36px;">
     <h4> Select Replay File</h4>
+
+    <!-- Target device must be selected warning message -->
+    @if (State.ReplayTargetDevice is null)
+    {
+        <span style="color:red;font-size:large;font-weight:bold;margin-top:-6px;">&nbsp;-&nbsp;&nbsp;A target device must be selected before a replay file can be selected.</span>
+    }
 </div>
 
 <!-- Spacer -->
