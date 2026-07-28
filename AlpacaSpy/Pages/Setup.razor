@@ -185,7 +185,7 @@
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Console Appearance:</label>
-                    <RadzenDropDown TValue="ConsoleAppearance"
+                    <RadzenDropDown TValue="ConsoleVisibility"
                                     Data="@_consoleAppearancees"
                                     @bind-Value="settings.ConsoleAppearance"
                                     Style="width:180px;"
@@ -391,7 +391,7 @@
 @code {
     private bool _discoveryRunning;
     private readonly LogLevel[] _logLevels = Enum.GetValues<LogLevel>();
-    private readonly ConsoleAppearance[] _consoleAppearancees = Enum.GetValues<ConsoleAppearance>();
+    private readonly ConsoleVisibility[] _consoleAppearancees = Enum.GetValues<ConsoleVisibility>();
 
     protected override void OnInitialized()
     {

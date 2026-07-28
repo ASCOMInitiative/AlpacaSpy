@@ -152,7 +152,7 @@ namespace AlpacaSpy
 
         #endregion
 
-        public ConsoleAppearance ConsoleAppearance { get; set; } = ConsoleAppearance.Hidden;
+        public ConsoleVisibility ConsoleAppearance { get; set; } = ConsoleVisibility.Hidden;
 
         public bool UpdateCheck { get; set; } = true;
 

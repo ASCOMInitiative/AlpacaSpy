@@ -1,6 +1,6 @@
 ﻿namespace AlpacaSpy
 {
-    public enum ConsoleAppearance
+    public enum ConsoleVisibility
     {
         Hidden = 0,
         Minimized = 1,

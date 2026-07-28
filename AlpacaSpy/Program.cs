@@ -21,7 +21,7 @@ namespace AlpacaSpy
 
         internal static State state = new();
         internal static Settings settings = new Settings(string.Empty);
-        internal static AppLogger logger = new ("AlpacaSpy", state, settings);
+        internal static AppLogger logger = new("AlpacaSpy", state, settings);
 
         internal static IHostApplicationLifetime? applicationLifetime;
         internal static bool RestartRequested;
@@ -31,15 +31,15 @@ namespace AlpacaSpy
             // Set the required type of console window
             switch (settings.ConsoleAppearance)
             {
-                case ConsoleAppearance.Minimized:
+                case ConsoleVisibility.Minimized:
                     ConsoleHider.MinimizeConsoleWindow();
                     break;
 
-                case ConsoleAppearance.Hidden:
+                case ConsoleVisibility.Hidden:
                     ConsoleHider.HideConsoleWindow();
                     break;
 
-                case ConsoleAppearance.Normal:
+                case ConsoleVisibility.Normal:
                     // Do nothing, leave the console window as is
                     break;
 
@@ -85,7 +85,6 @@ namespace AlpacaSpy
                     return;
                 }
 
-                // Start the check for updates in a background task
                 // Start a task to check whether any updates are available, if configured to do so.
                 // The update check is started here to give the maximum time to get a result before the UI is first displayed
                 if (settings.UpdateCheck)
@@ -109,7 +108,9 @@ namespace AlpacaSpy
                 }
 
                 builder.Logging.ClearProviders();
-                builder.Logging.AddConsole();
+                builder.Logging.AddProvider(new ConsoleLoggerProvider(settings.LogLevel.ToMSLogLevel())); // Add the customised logger
+
+                //builder.Logging.AddConsole();
                 builder.Logging.SetMinimumLevel(ToMicrosoftLogLevel(settings.LogLevel));
 
                 Logging.AttachLogger(logger);
@@ -142,7 +143,7 @@ namespace AlpacaSpy
                 // Add the file browser service as a singleton
                 builder.Services.AddSingleton<FileBrowserService>();
 
-
+                // Build the application
                 WebApplication app = builder.Build();
 
                 if (!app.Environment.IsDevelopment())
@@ -226,8 +227,8 @@ namespace AlpacaSpy
 
                         ProcessWindowStyle windowStyle = settings.ConsoleAppearance switch
                         {
-                            ConsoleAppearance.Minimized => ProcessWindowStyle.Minimized,
-                            ConsoleAppearance.Hidden => ProcessWindowStyle.Hidden,
+                            ConsoleVisibility.Minimized => ProcessWindowStyle.Minimized,
+                            ConsoleVisibility.Hidden => ProcessWindowStyle.Hidden,
                             _ => ProcessWindowStyle.Normal
                         };
 
