@@ -16,7 +16,7 @@ namespace AlpacaSpy
     /// logs the raw HTTP traffic, and forwards them to the actual device.
     /// Management API (/management/...) and Blazor routes pass through unmodified.
     /// </summary>
-    public class AlpacaProxyMiddleware(RequestDelegate next, IHttpClientFactory httpClientFactory, State state, AlpacaSpyLogger logger)
+    public class AlpacaProxyMiddleware(RequestDelegate next, IHttpClientFactory httpClientFactory, State state, AppLogger logger)
     {
         private static readonly Regex DeviceApiPattern = new(@"^/api/v1/([^/]+)/(\d+)/([^?]*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 

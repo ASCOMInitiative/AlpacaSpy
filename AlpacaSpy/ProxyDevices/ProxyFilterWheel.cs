@@ -10,12 +10,12 @@ namespace AlpacaSpy.ProxyDevices
         private readonly ConfiguredDevice _config;
         private readonly State _state;
         private readonly Settings _settings;
-        private readonly AlpacaSpyLogger _logger;
+        private readonly AppLogger _logger;
         private AlpacaFilterWheel? _client;
 
         private AlpacaFilterWheel Client => _client ?? throw new NotConnectedException($"Not connected to {_config.Name}");
 
-        public ProxyFilterWheel(ConfiguredDevice config, State state, Settings settings, AlpacaSpyLogger logger)
+        public ProxyFilterWheel(ConfiguredDevice config, State state, Settings settings, AppLogger logger)
         {
             _config = config;
             _state = state;

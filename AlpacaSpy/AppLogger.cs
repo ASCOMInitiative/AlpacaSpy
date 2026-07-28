@@ -7,19 +7,12 @@ using LogLevel = ASCOM.Common.Interfaces.LogLevel;
 
 namespace AlpacaSpy
 {
-    public class AlpacaSpyLogger : TraceLogger, ITraceLogger, ILogger
+    public class AppLogger : TraceLogger, IAppLogger, ITraceLogger, ILogger
     {
         private readonly State state;
         private readonly Settings settings;
 
-        public AlpacaSpyLogger(State state, Settings settings) : base("AlpacaSpy", true)
-        {
-            this.state = state;
-            this.settings = settings;
-            SetMinimumLoggingLevel(settings.LogLevel);
-        }
-
-        public AlpacaSpyLogger(string logFileName, State state, Settings settings) : base("AlpacaSpy", true)
+        public AppLogger(string logName, State state, Settings settings) : base(logName, true)
         {
             this.state = state;
             this.settings = settings;
@@ -28,11 +21,15 @@ namespace AlpacaSpy
 
         public event EventHandler<MessageEventArgs>? MessageLogChanged;
 
-        void ILogger.Log(LogLevel level, string message)
+        // Overwritten methods from TraceLogger to ensure that logging is handled by this logger
+        public new void Log(LogLevel level, string message)
         {
             LogMessage(string.Empty, level, message);
         }
+        public new void LogMessage(string method, string message) => LogMessage(method, LogLevel.Information, message);
+        public new void BlankLine() => LogBlankLine();
 
+        // Methods unique to this logger
         public void LogMessage(string method, LogLevel logLevel, string message, bool logToScreen = true)
         {
             try
@@ -103,8 +100,6 @@ namespace AlpacaSpy
                 Console.WriteLine($"Logger.LogMessage Exception: {ex.Message}\r\n{ex}");
             }
         }
-
-        public new void LogMessage(string method, string message) => LogMessage(method, LogLevel.Information, message);
         public void LogDebug(string method, string message) => LogMessage(method, LogLevel.Debug, message);
         public void LogWarning(string method, string message) => LogMessage(method, LogLevel.Warning, message);
         public void LogError(string method, string message) => LogMessage(method, LogLevel.Error, message);
@@ -114,7 +109,6 @@ namespace AlpacaSpy
         public void LogWarningConsole(string method, string message) => LogMessage(method, LogLevel.Warning, message, logToScreen: false);
         public void LogErrorConsole(string method, string message) => LogMessage(method, LogLevel.Error, message, logToScreen: false);
         public void LogBlankLine() => LogMessage(string.Empty, string.Empty);
-        public new void BlankLine() => LogBlankLine();
         public void LogWarning(string message) => LogWarning(string.Empty, message);
         public void LogError(string message) => LogError(string.Empty, message);
         public void ClearScreen()
@@ -124,6 +118,7 @@ namespace AlpacaSpy
                 state.ApplicationLog.Clear();
             }
         }
+
         /// <summary>
         /// Append the specified number of new lines to the output
         /// </summary>
@@ -143,7 +138,6 @@ namespace AlpacaSpy
                     catch (ArgumentOutOfRangeException) // Exceeded the screen log length so truncate it
                     {
                         // Truncate the screen log
-                        int originalLength = state.ApplicationLog.Length;
                         state.ApplicationLog.Remove(0, Globals.LOG_TRUNCATION_CHARACTERS);
 
                         // Write the new line to the truncated screen log
@@ -159,6 +153,8 @@ namespace AlpacaSpy
             }
         }
 
+        #region Private members
+
         private void OnMessageLogChanged(string message)
         {
             MessageEventArgs eventArgs = new()
@@ -168,5 +164,7 @@ namespace AlpacaSpy
 
             MessageLogChanged?.Invoke(this, eventArgs);
         }
+
+        #endregion
     }
 }

@@ -1,0 +1,58 @@
+﻿using Octokit;
+using Semver;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Updates
+{
+    public static class GitHubReleases
+    {
+        public static Task<IReadOnlyList<Release>> GetReleases(string owner, string name)
+        {
+            ArgumentNullException.ThrowIfNull(owner);
+            ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+
+            ArgumentNullException.ThrowIfNull(name);
+            ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+            var Github = new GitHubClient(new ProductHeaderValue($@"{name}-UpdateCheck"));
+
+            return Github.Repository.Release.GetAll(owner, name);
+        }
+
+        public static Release? LatestRelease(this IEnumerable<Release> releases)
+        {
+            ArgumentNullException.ThrowIfNull(releases);
+            return releases.Where(rp => !rp.Prerelease).Latest();
+        }
+
+        public static Release? LatestPrerelease(this IEnumerable<Release> releases)
+        {
+            ArgumentNullException.ThrowIfNull(releases);
+            return releases.Where(rp => rp.Prerelease).Latest();
+
+        }
+
+        public static Release? Latest(this IEnumerable<Release> releases)
+        {
+            ArgumentNullException.ThrowIfNull(releases);
+            if (releases.Any())
+            {
+                return releases.OrderBy(rp => rp.ReleaseSemVersionFromTag()).LastOrDefault();
+            }
+            return null;
+        }
+
+        public static SemVersion ReleaseSemVersionFromTag(this Release release)
+        {
+            ArgumentNullException.ThrowIfNull(release);
+            if (!string.IsNullOrEmpty(release.TagName) && SemVersion.TryParse(release.TagName, SemVersionStyles.AllowV, out SemVersion? _latest_release_version))
+            {
+                return _latest_release_version;
+            }
+            return SemVersion.ParsedFrom(0, 0, 0, release.TagName ?? "No Tag");
+        }
+    }
+}

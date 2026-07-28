@@ -4,11 +4,11 @@ namespace AlpacaSpy
 {
     public class CircuitHandlerService : CircuitHandler
     {
-        private readonly AlpacaSpyLogger logger;
+        private readonly AppLogger logger;
         private readonly Lock _lock = new();
         private readonly List<string> _connections = [];
 
-        public CircuitHandlerService(AlpacaSpyLogger logger)
+        public CircuitHandlerService(AppLogger logger)
         {
             this.logger = logger;
         }

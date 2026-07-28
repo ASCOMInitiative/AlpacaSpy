@@ -2,7 +2,7 @@
 
 @inject State state
 @inject Settings settings
-@inject AlpacaSpyLogger logger
+@inject AppLogger logger
 @inject DialogService DialogService
 
 @implements IDisposable
@@ -23,27 +23,47 @@
 else
 {
     <div class="sidebar-nav @NavMenuCssClass" style="flex-direction:column; height:calc(100vh - 3.5rem);" @onclick="ToggleNavMenu">
+        @* Navigation items *@
         <nav class="flex-column">
+            @* Home *@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
                     <span class="oi oi-home" aria-hidden="true"></span> Home
                 </NavLink>
             </div>
+
+            @* Record / Export *@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/recordexport" Match="NavLinkMatch.All">
                     <span style="color:white" class="oi oi-cog" aria-hidden="true"></span> <span style="color:white">Record and Export</span>
                 </NavLink>
             </div>
+
+            @* Replay *@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/filebrowser" Match="NavLinkMatch.All">
                     <span style="color:white" class="oi oi-cog" aria-hidden="true"></span> <span style="color:white">Replay Recordings</span>
                 </NavLink>
             </div>
+
+            @* Setup *@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/setup" Match="NavLinkMatch.All">
                     <span style="color:white" class="oi oi-cog" aria-hidden="true"></span> <span style="color:yellow">Setup</span>
                 </NavLink>
             </div>
+
+            @* Update *@
+            @if (Update.UpdateAvailable())
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/update" Match="NavLinkMatch.All">
+                        <span style="color:white" class="oi oi-cog" aria-hidden="true"></span> <span style="color:coral">Update Available</span>
+                    </NavLink>
+                </div>
+            }
+
+            @* Help *@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/help" Match="NavLinkMatch.All">
                     <span style="color:white" class="oi oi-cog" aria-hidden="true"></span> <span style="color:white">Help</span>

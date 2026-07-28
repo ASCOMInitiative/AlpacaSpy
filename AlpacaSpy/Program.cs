@@ -21,7 +21,7 @@ namespace AlpacaSpy
 
         internal static State state = new();
         internal static Settings settings = new Settings(string.Empty);
-        internal static AlpacaSpyLogger logger = new(state, settings);
+        internal static AppLogger logger = new ("AlpacaSpy", state, settings);
 
         internal static IHostApplicationLifetime? applicationLifetime;
         internal static bool RestartRequested;
@@ -85,6 +85,21 @@ namespace AlpacaSpy
                     return;
                 }
 
+                // Start the check for updates in a background task
+                // Start a task to check whether any updates are available, if configured to do so.
+                // The update check is started here to give the maximum time to get a result before the UI is first displayed
+                if (settings.UpdateCheck)
+                {
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            Update.CheckForUpdates(logger).Wait();
+                        }
+                        catch { } // Ignore exceptions here
+                    });
+                }
+
                 WebApplicationBuilder builder = WebApplication.CreateBuilder(args ?? []);
 
                 if (!(args?.Any(str => str.Contains("--urls")) ?? false))
@@ -120,7 +135,7 @@ namespace AlpacaSpy
                 builder.Services.AddRadzenComponents();
                 builder.Services.AddScoped<PerBrowserState>();
                 builder.Services.AddSingleton<State>(_ => state);
-                builder.Services.AddSingleton<AlpacaSpyLogger>(_ => logger);
+                builder.Services.AddSingleton<AppLogger>(_ => logger);
                 builder.Services.AddSingleton<Settings>(_ => settings);
                 builder.Services.AddSingleton<CircuitHandler, CircuitHandlerService>();
 

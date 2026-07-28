@@ -11,10 +11,7 @@
       <InfoVersion>$(ProductMajor).$(ProductMinor).$(ProductPatch)$(ProductPreReleaseSeparator)$(ProductPreRelease)+$(BuildNumber)</InfoVersion>
     </PropertyGroup>
 
-    <WriteLinesToFile
-      File="$([System.IO.Path]::Combine('$(PublishDir)', '..', 'InformationVersion.txt'))"
-      Overwrite="true"
-      Lines="$(InfoVersion)" />
+    <WriteLinesToFile File="$([System.IO.Path]::Combine('$(PublishDir)', '..', 'InformationVersion.txt'))" Overwrite="true" Lines="$(InfoVersion)" />
   </Target>
 
   <PropertyGroup>
@@ -102,7 +99,9 @@
     <PackageReference Include="ASCOM.Alpaca.Razor" Version="0.6.0-alpha02" />
     <PackageReference Include="ASCOM.Tools" Version="4.0.0-rc.8" />
     <PackageReference Include="Microsoft.OpenApi" Version="3.8.0" />
+    <PackageReference Include="Octokit" Version="14.0.0" />
     <PackageReference Include="Radzen.Blazor" Version="11.1.3" />
+    <PackageReference Include="Semver" Version="3.0.0" />
   </ItemGroup>
 
 </Project>

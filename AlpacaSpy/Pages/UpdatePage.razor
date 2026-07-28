@@ -1,0 +1,131 @@
+﻿@page "/update"
+@using Octokit
+@inject State state
+@inject Settings settings
+@inject AppLogger logger
+@inject IJSRuntime JSRuntime
+@inject DialogService DialogService
+
+@implements IAsyncDisposable
+
+<PageTitle>@Globals.APPLICATION_NAME - Help</PageTitle>
+
+<h2 style="margin-top:0px;">Introduction</h2>
+<p>
+    Version - @Update.VersionDisplayString
+    <br />
+    Copyright © 2026-@(DateTime.Now.Year) Peter Simpson
+</p>
+
+<h4 style="margin-top:40px;">Updates</h4>
+@if (@Update.UpdateAvailable(logger))
+{
+    @if (@Update.HasNewerRelease)
+    {
+        <span style="color:blue"><b>New release available</b></span>
+        <span>: @Update.LatestReleaseName (@Update.LatestReleaseVersion) - URL: <a href="@Update.ReleaseUrl" target="_blank">@Update.ReleaseUrl</a></span>
+        <br />
+    }
+
+    @if (@Update.HasNewerPreview)
+    {
+        <span style="color:blue"><b>New pre-release available</b></span>
+        <span>: @Update.LatestPreviewName (@Update.LatestPreviewVersion) - URL:<a href="@Update.PreviewURL" target="_blank">@Update.PreviewURL</a></span>
+    }
+}
+else
+{
+    @if (Update.AheadOfRelease)
+    {
+        <p>Ahead of release!</p>
+    }
+    else
+    {
+        @if (@Update.UpToDate)
+        {
+            <p>Up to date</p>
+        }
+        else
+        {
+            @if (@Update.AheadOfPreview)
+            {
+                <p>Ahead of preview!</p>
+            }
+            else
+            {
+                <p>No updates available.</p>
+            }
+        }
+    }
+}
+
+<h4 style="margin-top:40px;">Check for updates</h4>
+<RadzenButton Id="CheckForUpdatesButton" Click=@(args => CheckForUpdates()) Text="Check Now" Style="margin-bottom: 10px; margin-right: 10px; width: 130px;" />
+
+<h5 style="margin-top:20px;">Progress</h5>
+<RadzenTextArea Id="UpdateLog" Style="line-height: 18px; padding-bottom: 0px" Name="UpdateLog" @bind-Value=@updateLogMessages Rows="20" Cols="150" ReadOnly=true />
+
+@code {
+    string updateLogMessages = "";
+
+    private async void LogMessage(string method, string message)
+    {
+        updateLogMessages += $"{DateTime.Now:hh:mm:ss.fff} {message}\r\n";
+        logger.LogDebug(method, message);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void CheckForUpdates()
+    {
+        Task.Run(() =>
+        {
+
+            Task? getReleasesTask = null;
+
+            try
+            {
+                updateLogMessages = "";
+                LogMessage("AppUpdates.CheckForUpdates", "Searching for updates...");
+                getReleasesTask = Task.Run(async () => { await Update.GetReleases(logger); });
+                LogMessage("AppUpdates.CheckForUpdates", "Waiting for task to complete...");
+
+                Task.WaitAll(getReleasesTask);
+                if (getReleasesTask.IsCompletedSuccessfully)
+                {
+                    if (Update.Releases.Count > 0)
+                    {
+                        foreach (Release release in Update.Releases)
+                        {
+                            LogMessage("AppUpdates.CheckForUpdates", $"Found release: {release.Name} ({(release.Prerelease ? "Pre-release" : "Release")})");
+                        }
+                    }
+                    else
+                        LogMessage("AppUpdates.CheckForUpdates", $"No updates found.");
+
+                    LogMessage("AppUpdates.CheckForUpdates", $"Completed");
+                }
+                else
+                {
+                    if (getReleasesTask is not null)
+                    {
+                        if (getReleasesTask.Exception is not null)
+                        {
+                            throw getReleasesTask.Exception.Flatten();
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                LogMessage("AppUpdates.CheckForUpdates", $"Exception retrieving update status from GitHub: {getReleasesTask?.Exception?.InnerException?.Message}");
+            }
+        });
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        // Add any cleanup code here if needed
+
+        return ValueTask.CompletedTask;
+    }
+}

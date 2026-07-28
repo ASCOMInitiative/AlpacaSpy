@@ -1,13 +1,15 @@
 ﻿@page "/help"
 @inject State state
 @inject Settings settings
-@inject AlpacaSpyLogger logger
+@inject AppLogger logger
 @inject IJSRuntime JSRuntime
 @inject DialogService DialogService
 
 @implements IAsyncDisposable
 
 <PageTitle>@Globals.APPLICATION_NAME - Help</PageTitle>
+
+<p style="margin-top: 20px">Version @Update.VersionDisplayString  -  Copyright © Peter Simpson (ASCOM Initiative) 2026-@DateTime.Now.Year</p>
 
 <h2 style="margin-top:0px;">Introduction</h2>
 <p>

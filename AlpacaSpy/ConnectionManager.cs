@@ -5,7 +5,7 @@ namespace AlpacaSpy
 {
     internal static class ConnectionManager
     {
-        internal static async Task ChangeConnectedStateAsync(State state, Settings settings, AlpacaSpyLogger logger, Func<Task> invokeStateHasChanged, bool connectOnly = false)
+        internal static async Task ChangeConnectedStateAsync(State state, Settings settings, AppLogger logger, Func<Task> invokeStateHasChanged, bool connectOnly = false)
         {
             lock (Globals.StateLock)
             {
@@ -37,14 +37,14 @@ namespace AlpacaSpy
             }
         }
 
-        internal static void Disconnect(State state, AlpacaSpyLogger logger)
+        internal static void Disconnect(State state, AppLogger logger)
         {
             logger.LogMessage("Disconnect", "Proxy monitoring stopped.");
             logger.LogBlankLine();
             state.Connected = false;
         }
 
-        internal static async Task ConnectAsync(State state, Settings settings, AlpacaSpyLogger logger)
+        internal static async Task ConnectAsync(State state, Settings settings, AppLogger logger)
         {
             await Globals.ConnectSemaphore.WaitAsync();
             try

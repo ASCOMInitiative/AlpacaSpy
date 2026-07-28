@@ -33,6 +33,9 @@ namespace AlpacaSpy
 
         internal const string IMAGEBYTES_PROXY_RESPONSE = @"{""Value"": ""ImageArray response not recorded or checked due to length and JSON/ImageBytes complexity."", ""ClientTransactionID"": 1, ""ServerTransactionID"": 1, ""ErrorNumber"": 0, ""ErrorMessage"": """"}";
 
+        internal const string GITHUB_OWNER = "ASCOMInitiative";
+        internal const string GITHUB_REPOSITORY = "AlpacaSpy";
+
         // The number of columns to display for each device type in the setup window's property list.
         internal static readonly Dictionary<AlpacaDeviceType, int> DevicetypeDisplayColumns = new()
         {
