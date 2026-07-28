@@ -1,4 +1,4 @@
-﻿@page "/update"
+﻿@page "/updates"
 @using Octokit
 @inject State state
 @inject Settings settings
@@ -12,9 +12,7 @@
 
 <h2 style="margin-top:0px;">Introduction</h2>
 <p>
-    Version - @Update.VersionDisplayString
-    <br />
-    Copyright © 2026-@(DateTime.Now.Year) Peter Simpson
+    This page shows any release or release candidate versions that are available for download from the GitHub repository.
 </p>
 
 <h4 style="margin-top:40px;">Updates</h4>

@@ -9,8 +9,11 @@
 
 <PageTitle>@Globals.APPLICATION_NAME - Help</PageTitle>
 
-<p style="margin-top: 20px">Version @Update.VersionDisplayString  -  Copyright © Peter Simpson (ASCOM Initiative) 2026-@DateTime.Now.Year</p>
-
+<p>
+    <b>Version</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; @Update.VersionDisplayString
+    <br />
+    <b>Copyright</b>&nbsp; © 2026-@(DateTime.Now.Year) Peter Simpson (ASCOM Initiative)
+</p>
 <h2 style="margin-top:0px;">Introduction</h2>
 <p>
     Analysing Alpaca client and device logs when debugging issues can be challenging due to differences in logging styles and completeness of logs. @Globals.APPLICATION_NAME
@@ -120,8 +123,8 @@ There are cross-cutting settings for @Globals.APPLICATION_SHORT_NAME as a whole:
 
 <h4>Headless Running</h4>
 <p>
-    The @Globals.APPLICATION_SHORT_NAME executable will continue to run after all browser sessions are terminated. The best way to terminate the application 
-    is by connecting a browser to the @Globals.APPLICATION_SHORT_NAME IP port (default @Globals.DEFAULT_ALPACA_PORT) and using the Shutdown button in the Navigation pane. 
+    The @Globals.APPLICATION_SHORT_NAME executable will continue to run after all browser sessions are terminated. The best way to terminate the application
+    is by connecting a browser to the @Globals.APPLICATION_SHORT_NAME IP port (default @Globals.DEFAULT_ALPACA_PORT) and using the Shutdown button in the Navigation pane.
     Alternatively, the "@Globals.APPLICATION_NAME" process can be terminated through Task Manager.
 </p>
 
