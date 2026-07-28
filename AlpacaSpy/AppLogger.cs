@@ -1,5 +1,4 @@
 using AlpacaSpy.Models;
-using ASCOM.Common;
 using ASCOM.Common.Interfaces;
 using ASCOM.Tools;
 using ILogger = ASCOM.Common.Interfaces.ILogger;
@@ -12,6 +11,8 @@ namespace AlpacaSpy
         private readonly State state;
         private readonly Settings settings;
 
+        #region Constructors
+
         public AppLogger(string logName, State state, Settings settings) : base(logName, true)
         {
             this.state = state;
@@ -19,9 +20,16 @@ namespace AlpacaSpy
             SetMinimumLoggingLevel(settings.LogLevel);
         }
 
+        #endregion
+
+        #region Public events
+
         public event EventHandler<MessageEventArgs>? MessageLogChanged;
 
-        // Overwritten methods from TraceLogger to ensure that logging is handled by this logger
+        #endregion
+
+        #region Public overwritten TraceLogger methods to ensure that logging is handled by this logger
+
         public new void Log(LogLevel level, string message)
         {
             LogMessage(string.Empty, level, message);
@@ -29,7 +37,10 @@ namespace AlpacaSpy
         public new void LogMessage(string method, string message) => LogMessage(method, LogLevel.Information, message);
         public new void BlankLine() => LogBlankLine();
 
-        // Methods unique to this logger
+        #endregion
+
+        #region  Public methods unique to this logger
+
         public void LogMessage(string method, LogLevel logLevel, string message, bool logToScreen = true)
         {
             try
@@ -152,6 +163,8 @@ namespace AlpacaSpy
                 OnMessageLogChanged("\r\n");
             }
         }
+
+        #endregion
 
         #region Private members
 
