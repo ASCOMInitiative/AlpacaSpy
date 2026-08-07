@@ -199,7 +199,7 @@ namespace AlpacaSpy
 
                     Octokit.Release? latestRelease = Update.Releases?.LatestRelease();
                     Octokit.Release? latestPreRelease = Update.Releases?.LatestPrerelease();
-                    if ((latestRelease is not null) & (latestPreRelease is not null))
+                    if ((latestRelease is not null) && (latestPreRelease is not null))
                     {
 
                         bool latesOk = SemVersion.TryParse(latestRelease?.TagName, SemVersionStyles.AllowV, out SemVersion? latestVersion);
@@ -215,7 +215,7 @@ namespace AlpacaSpy
 
                         if (latestVersion != null)
                         {
-                            if (SemVersion.ComparePrecedence(installedVersion, latestVersion) == -1)  //(installedRelease < latestrelease)
+                            if (SemVersion.ComparePrecedence(installedVersion, latestVersion) == -1)  //(installedRelease < latestRelease)
                             {
                                 HasNewerRelease = true;
                                 LatestReleaseVersion = latestRelease?.TagName ?? "";
@@ -223,7 +223,7 @@ namespace AlpacaSpy
                                 ReleaseUrl = latestRelease?.HtmlUrl ?? "";
                             }
 
-                            if (SemVersion.ComparePrecedence(installedVersion, latestVersion) == 1)  //(installedRelease > latestrelease)
+                            if (SemVersion.ComparePrecedence(installedVersion, latestVersion) == 1)  //(installedRelease > latestRelease)
                             {
                                 logger?.LogDebug("Update.SetProperties", $"Update - Setting AheadOfRelease True");
                                 AheadOfRelease = true;
@@ -236,8 +236,8 @@ namespace AlpacaSpy
 
                         if (latestPreReleaseVersion != null)
                         {
-                            logger?.LogDebug("Update.SetProperties", $"Update - (SemVersion.ComparePrecedence(currentversion, latestprerelease) == -1) && (SemVersion.ComparePrecedence(latestrelease, latestprerelease) == -1): {(SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == -1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1)}");
-                            if ((SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == -1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1)) //installedRelease < latestprerelease && latestrelease < latestprerelease
+                            logger?.LogDebug("Update.SetProperties", $"Update - (SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == -1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1): {(SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == -1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1)}");
+                            if ((SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == -1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1)) //installedRelease < latestPreRelease && latestRelease < latestPreRelease
                             {
                                 HasNewerPreview = true;
                                 LatestPreviewVersion = latestPreRelease?.TagName ?? "";
@@ -245,8 +245,8 @@ namespace AlpacaSpy
                                 PreviewURL = latestPreRelease?.HtmlUrl ?? "";
                             }
 
-                            logger?.LogDebug("Update.SetProperties", $"Update - (SemVersion.ComparePrecedence(currentversion, latestprerelease) == -1) && (SemVersion.ComparePrecedence(latestrelease, latestprerelease) == 1): {(SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == 1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1)}");
-                            if ((SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == 1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1)) //(installedRelease > latestprerelease && latestrelease < latestprerelease)
+                            logger?.LogDebug("Update.SetProperties", $"Update - (SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == 1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1): {(SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == 1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1)}");
+                            if ((SemVersion.ComparePrecedence(installedVersion, latestPreReleaseVersion) == 1) && (SemVersion.ComparePrecedence(latestVersion, latestPreReleaseVersion) == -1)) //(installedRelease > latestPreRelease && latestRelease < latestPreRelease)
                             {
                                 AheadOfPreview = true;
                             }
