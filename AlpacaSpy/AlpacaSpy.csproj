@@ -30,12 +30,12 @@
 
   <PropertyGroup>
     <!-- Set version numbers -->
-    <ProductMajor>0</ProductMajor>
-    <ProductMinor>9</ProductMinor>
+    <ProductMajor>1</ProductMajor>
+    <ProductMinor>0</ProductMinor>
     <ProductPatch>0</ProductPatch>
 
     <!-- Set the prerelease string without a leading minus e.g. rc.1 or leave empty for a production release -->
-    <ProductPreRelease>rc.2</ProductPreRelease>
+    <ProductPreRelease></ProductPreRelease>
 
     <!--Create a dynamic revision number based on time of build
 		 
@@ -98,9 +98,9 @@
     <PackageReference Include="ASCOM.Alpaca.Components" Version="4.0.0-rc.8" />
     <PackageReference Include="ASCOM.Alpaca.Razor" Version="0.6.0-alpha02" />
     <PackageReference Include="ASCOM.Tools" Version="4.0.0-rc.8" />
-    <PackageReference Include="Microsoft.OpenApi" Version="3.8.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="3.9.0" />
     <PackageReference Include="Octokit" Version="14.0.0" />
-    <PackageReference Include="Radzen.Blazor" Version="11.1.3" />
+    <PackageReference Include="Radzen.Blazor" Version="11.2.2" />
     <PackageReference Include="Semver" Version="3.0.0" />
   </ItemGroup>
 
