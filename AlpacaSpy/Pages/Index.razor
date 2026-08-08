@@ -100,7 +100,7 @@
 
     private void HandleResize()
     {
-        bool newIsSmall = Globals.IsSmall(Ui.Width, Ui.Height);
+        bool newIsSmall = Globals.IsSmall(Ui.Width, 20000);
 
         if (newIsSmall != isSmall)
         {

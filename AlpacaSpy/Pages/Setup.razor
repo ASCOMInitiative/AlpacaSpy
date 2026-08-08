@@ -4,6 +4,8 @@
 @inject AppLogger logger
 @inject IJSRuntime JSRuntime
 @inject DialogService DialogService
+@inject SessionState Ui
+
 @using ASCOM.Alpaca.Discovery
 @using ASCOM.Common.Interfaces
 @using ASCOM.Common.Alpaca
@@ -16,33 +18,66 @@
 
 <div style="margin-bottom:16px;">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;">
-        <RadzenButton Click="RunDiscoveryAsync"
-                      Text="Discover and select Alpaca devices"
-                      ButtonStyle="ButtonStyle.Primary"
-                      Style="border-radius:20px; text-transform:none;"
-                      Disabled="@(_discoveryRunning || state.Connected)" />
+        @if (isSmall)
+        {
+            <RadzenButton Click="RunDiscoveryAsync"
+            Text="Discover Devices"
+            ButtonStyle="ButtonStyle.Primary"
+            Style="border-radius:20px; text-transform:none;"
+            Disabled="@(_discoveryRunning || state.Connected)" />
 
-        <span>@state.StatusText</span>
+            <span>@state.StatusText</span>
 
-        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
-            <RadzenButton Click="ClearDiscoveredDevicesAsync"
-                          Text="Clear discovered devices"
-                          ButtonStyle="ButtonStyle.Warning"
-                          Style="border-radius:20px; text-transform:none;"
-                          Disabled="@(_discoveryRunning)" />
+            <div style="margin-left:auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+                <RadzenButton Click="ClearDiscoveredDevicesAsync"
+                Text="Clear Devices"
+                ButtonStyle="ButtonStyle.Warning"
+                Style="border-radius:20px; text-transform:none;"
+                Disabled="@(_discoveryRunning)" />
 
-            <RadzenButton Click="DeleteAllConfiguredDevicesAsync"
-                          Text="Delete all devices"
-                          ButtonStyle="ButtonStyle.Danger"
+                <RadzenButton Click="DeleteAllConfiguredDevicesAsync"
+                Text="Delete Devices"
+                ButtonStyle="ButtonStyle.Danger"
+                Style="border-radius:20px; text-transform:none;"
+                Disabled="@(_discoveryRunning || state.Connected)" />
+
+                <RadzenButton Click="ResetSettingsAsync"
+                Text="Reset All"
+                ButtonStyle="ButtonStyle.Danger"
+                Style="border-radius:20px; text-transform:none;"
+                Disabled="@(_discoveryRunning || state.Connected)" />
+            </div>
+        }
+        else
+        {
+            <RadzenButton Click="RunDiscoveryAsync"
+                          Text="Discover and select Alpaca devices"
+                          ButtonStyle="ButtonStyle.Primary"
                           Style="border-radius:20px; text-transform:none;"
                           Disabled="@(_discoveryRunning || state.Connected)" />
 
-            <RadzenButton Click="ResetSettingsAsync"
-                          Text="Reset All Settings"
-                          ButtonStyle="ButtonStyle.Danger"
-                          Style="border-radius:20px; text-transform:none;"
-                          Disabled="@(_discoveryRunning || state.Connected)" />
-        </div>
+            <span>@state.StatusText</span>
+
+            <div style="margin-left:auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+                <RadzenButton Click="ClearDiscoveredDevicesAsync"
+                              Text="Clear discovered devices"
+                              ButtonStyle="ButtonStyle.Warning"
+                              Style="border-radius:20px; text-transform:none;"
+                              Disabled="@(_discoveryRunning)" />
+
+                <RadzenButton Click="DeleteAllConfiguredDevicesAsync"
+                              Text="Delete all devices"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Style="border-radius:20px; text-transform:none;"
+                              Disabled="@(_discoveryRunning || state.Connected)" />
+
+                <RadzenButton Click="ResetSettingsAsync"
+                              Text="Reset All Settings"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Style="border-radius:20px; text-transform:none;"
+                              Disabled="@(_discoveryRunning || state.Connected)" />
+            </div>
+        }
     </div>
 
     @if (state.Connected)
@@ -181,7 +216,7 @@
                                    Disabled="@state.Connected"
                                    Format="N0"
                                    Style="width:100px;" />
-                                   <span>Maximum number of recorded transactions per device (Default 100,000).</span>
+                    <span>Maximum number of recorded transactions per device (Default 100,000).</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Console Appearance:</label>
@@ -253,7 +288,7 @@
 
             string styleText = $"border:1px solid #ccc;padding:12px;border-radius:4px;max-width:{(numberOfColumns == 1 ? 700 : 60 + 270 * numberOfColumns)}px;";
 
-                <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId" Style="--rz-tabs-tab-display: inline-flex; --rz-tabs-tab-align-items: center;">
+            <RadzenTabsItem Text="@($"{device.Name} ({device.DeviceType})")" @key="device.UniqueId" Style="--rz-tabs-tab-display: inline-flex; --rz-tabs-tab-align-items: center;">
                 <div style=@styleText>
                     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
                         <span style="font-size:20px;font-weight:bold;">@device.Name</span>
@@ -389,16 +424,29 @@
 </RadzenTabs>
 
 @code {
+    private bool isSmall = true;
     private bool _discoveryRunning;
     private readonly LogLevel[] _logLevels = Enum.GetValues<LogLevel>();
     private readonly ConsoleVisibility[] _consoleAppearancees = Enum.GetValues<ConsoleVisibility>();
 
     protected override void OnInitialized()
     {
+        Ui.OnChange += HandleResize;
         state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
         state.StateChanged += OnStateChanged;
         settings.ConfigurationChanged += OnStateChanged;
         state.StatusText = ""; // Clear status text on entry.
+    }
+
+    private void HandleResize()
+    {
+        bool newIsSmall = Globals.IsSmall(Ui.Width, 20000);
+
+        if (newIsSmall != isSmall)
+        {
+            isSmall = newIsSmall;
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task RunDiscoveryAsync()
@@ -588,6 +636,7 @@
 
     public ValueTask DisposeAsync()
     {
+        //Ui.OnChange -= HandleResize;
         state.StateChanged -= OnStateChanged;
         settings.ConfigurationChanged -= OnStateChanged;
         return ValueTask.CompletedTask;
