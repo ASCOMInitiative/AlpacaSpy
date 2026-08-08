@@ -2,10 +2,20 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    height: 100vh;
+    min-height: 100vh;
 }
 
 main {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+article {
+    flex: 1;
+    min-height: 0;
 }
 
 .sidebar {
@@ -31,7 +41,7 @@ main {
         text-overflow: ellipsis;
     }
 
-@media (max-width: 640.98px) {
+@media (max-width: 1023.98px) {
     .top-row:not(.auth) {
         display: none;
     }
@@ -45,13 +55,16 @@ main {
     }
 }
 
-@media (min-width: 641px) {
+@media (min-width: 1024px) {
     .page {
         flex-direction: row;
     }
 
     .sidebar {
-        width: 300px;
+        width: 249px;
+        min-width: 249px;
+        max-width: 249px;
+        flex: 0 0 249px;
         height: 100vh;
         position: sticky;
         top: 0;

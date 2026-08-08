@@ -36,6 +36,9 @@ namespace AlpacaSpy
         internal const string GITHUB_OWNER = "ASCOMInitiative"; // "Peter-Simpson";//"ASCOMInitiative";
         internal const string GITHUB_REPOSITORY = "AlpacaSpy"; // "ReleaseTester"; // "AlpacaSpy";
 
+        internal const int SMALL_WIDTH = 1024;
+        internal const int SMALL_HEIGHT = 768;
+
         // The number of columns to display for each device type in the setup window's property list.
         internal static readonly Dictionary<AlpacaDeviceType, int> DevicetypeDisplayColumns = new()
         {
@@ -54,5 +57,10 @@ namespace AlpacaSpy
         internal static readonly Lock writeLogLock = new();
         internal static readonly SemaphoreSlim ConnectSemaphore = new(1, 1);
         internal static Lock StateLock = new();
+
+        public static bool IsSmall(int width, int height)
+        {
+            return width < SMALL_WIDTH || height < SMALL_HEIGHT;
+        }
     }
 }

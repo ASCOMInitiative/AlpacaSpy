@@ -95,9 +95,12 @@ fieldset legend {
         max-width: 22ch;
     }
 
-@media (min-width: 641px) {
+@media (min-width: 1024px) {
     .page > .sidebar {
-        width: 225px;
+        width: 249px;
+        min-width: 249px;
+        max-width: 249px;
+        flex: 0 0 249px;
         height: 100vh;
         position: sticky;
         top: 0;

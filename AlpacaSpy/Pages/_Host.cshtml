@@ -10,3 +10,33 @@
 }
 
 <component type="typeof(App)" render-mode="ServerPrerendered" />
+
+<script>
+    window.registerResizeHandler = (dotnetHelper) => {
+        let timeoutId;
+        const debounceMs = 10;
+
+        let lastWidth = null;
+        let lastHeight = null;
+
+        function notify() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+
+            if (w !== lastWidth || h !== lastHeight) {
+                lastWidth = w;
+                lastHeight = h;
+                dotnetHelper.invokeMethodAsync("OnBrowserResize", w, h);
+            }
+        }
+
+        window.addEventListener("resize", () => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(notify, debounceMs);
+        });
+
+        notify(); // initial
+    };
+
+</script>
+

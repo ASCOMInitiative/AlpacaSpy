@@ -1,3 +1,6 @@
+@inject SessionState Ui
+@inject IJSRuntime JS
+
 @namespace AlpacaSpy
 
 @inherits LayoutComponentBase
@@ -21,3 +24,19 @@
     </main>
 </div>
 <RadzenDialog />
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("registerResizeHandler", DotNetObjectReference.Create(this));
+        }
+    }
+
+    [JSInvokable]
+    public void OnBrowserResize(int width, int height)
+    {
+        Ui.SetSize(width, height);
+    }
+}

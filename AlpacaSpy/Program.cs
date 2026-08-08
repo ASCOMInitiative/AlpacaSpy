@@ -4,6 +4,7 @@ using ASCOM.Common;
 using ASCOM.Tools;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Radzen;
+using System.Data;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -142,6 +143,9 @@ namespace AlpacaSpy
 
                 // Add the file browser service as a singleton
                 builder.Services.AddSingleton<FileBrowserService>();
+
+                // Add the session state service as a scoped service
+                builder.Services.AddScoped<SessionState>();
 
                 // Build the application
                 WebApplication app = builder.Build();

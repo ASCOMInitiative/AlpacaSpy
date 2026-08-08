@@ -4,12 +4,20 @@
 @inject Settings settings
 @inject AppLogger logger
 @inject DialogService DialogService
+@inject SessionState Ui
 
 @implements IDisposable
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">@Globals.APPLICATION_NAME</a>
+        @if (isSmall)
+        {
+            <a class="navbar-brand" href="">@Globals.APPLICATION_NAME</a>
+        }
+        else
+        {
+            <a class="navbar-brand" style="color:yellow; flex:1; text-align:center;" href="">ASCOM</a>
+        }
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -120,11 +128,24 @@ else
 @code {
     private bool collapseNavMenu = true;
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private bool isSmall;
 
     protected override void OnInitialized()
     {
+        Ui.OnChange += HandleResize;
         state.StateChanged += OnStateChanged;
         settings.ConfigurationChanged += OnStateChanged;
+    }
+
+    private void HandleResize()
+    {
+        bool newIsSmall = Globals.IsSmall(Ui.Width, Ui.Height);
+        if (newIsSmall != isSmall)
+        {
+            isSmall = newIsSmall;
+            collapseNavMenu = true;
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private async void OnStateChanged(object? sender, EventArgs e)
@@ -144,6 +165,7 @@ else
 
     public void Dispose()
     {
+        Ui.OnChange -= HandleResize;
         state.StateChanged -= OnStateChanged;
         settings.ConfigurationChanged -= OnStateChanged;
     }
