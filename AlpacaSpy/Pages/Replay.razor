@@ -139,8 +139,8 @@
         @foreach (var device in State.ConfiguredDevices)
         {
             <div>
-                <input type="radio" name="targetDevice" id="@device.UniqueId" checked="@(State.ReplayTargetDevice?.UniqueId == device.UniqueId)" @onchange="() => SelectTargetDevice(device)" />
-                <label for="@device.UniqueId">@($"{device.DeviceType}/{device.ProxyDeviceNumber} {device.IpAddress}")</label>
+                <input style="margin-left:18px;" type="radio" name="targetDevice" id="@device.UniqueId" checked="@(State.ReplayTargetDevice?.UniqueId == device.UniqueId)" @onchange="() => SelectTargetDevice(device)" />
+                <label style="font-size:16px; margin-left:6px; margin-top:6px; position:relative; top:-1px;" for="@device.UniqueId">@($"{device.DeviceType}/{device.ProxyDeviceNumber} {device.IpAddress}")</label>
             </div>
         }
     }
