@@ -429,7 +429,7 @@
     private readonly LogLevel[] _logLevels = Enum.GetValues<LogLevel>();
     private readonly ConsoleVisibility[] _consoleAppearancees = Enum.GetValues<ConsoleVisibility>();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Ui.OnChange += HandleResize;
         state.ConfiguredDevices = settings.ConfiguredDevices.ToList();
@@ -438,14 +438,14 @@
         state.StatusText = ""; // Clear status text on entry.
     }
 
-    private void HandleResize()
+    private async void HandleResize()
     {
         bool newIsSmall = Globals.IsSmall(Ui.Width, 20000);
 
         if (newIsSmall != isSmall)
         {
             isSmall = newIsSmall;
-            InvokeAsync(StateHasChanged);
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -636,7 +636,7 @@
 
     public ValueTask DisposeAsync()
     {
-        //Ui.OnChange -= HandleResize;
+        Ui.OnChange -= HandleResize;
         state.StateChanged -= OnStateChanged;
         settings.ConfigurationChanged -= OnStateChanged;
         return ValueTask.CompletedTask;
