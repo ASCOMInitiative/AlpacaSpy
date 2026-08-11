@@ -87,6 +87,12 @@ namespace AlpacaSpy
                 return;
             }
 
+            if (!state.Connected)
+            {
+                await ReturnAlpacaErrorAsync(context, 1027, $"{Globals.APPLICATION_SHORT_NAME} is not connected.", StatusCodes.Status200OK);
+                return;
+            }
+
             // Read and buffer the request body (needed for both logging and forwarding)
             byte[] requestBodyBytes = await ReadRequestBodyAsync(context);
 
