@@ -21,7 +21,7 @@
                               Style="border-radius:20px; padding-top:2px; height:24px; min-height:24px;" />
             </span>
             <span style="margin-right:24px;">
-                <RadzenButton Click="OnCancelButtonPressed"
+                <RadzenButton Click="CancelButtonPressed"
                               Text="Cancel"
                               ButtonStyle="ButtonStyle.Danger"
                               Style="border-radius:20px; padding-top:2px; height:24px; min-height:24px;" />
@@ -36,7 +36,7 @@
                               Style="border-radius:20px;" />
             </span>
             <span style="margin-right:24px;">
-                <RadzenButton Click="OnCancelButtonPressed"
+                <RadzenButton Click="CancelButtonPressed"
                               Text="Cancel Playback"
                               ButtonStyle="ButtonStyle.Danger"
                               Style="border-radius:20px;" />
@@ -80,52 +80,32 @@
 
     protected override async Task OnInitializedAsync()
     {
-        Ui.OnChange += HandleResize;
-        state.CancellationToken = cancelAlpacaSpy.Token;
+        // Set up the event handlers
+        Ui.OnChange += OnBrowserResize;
         state.StateChanged += OnStateChanged;
         settings.ConfigurationChanged += OnStateChanged;
 
+        // Set the application cancel token
+        state.CancellationToken = cancelAlpacaSpy.Token;
+
+        // Get any current log content and place it in the cache
         lock (Globals.writeLogLock)
         {
             _cachedLogText = state.ApplicationLog.ToString();
+            _lastLogLength = state.ApplicationLog.Length;
         }
-        _lastLogLength = state.ApplicationLog.Length;
-    }
-
-    private void HandleResize()
-    {
-        bool newIsSmall = Globals.IsSmall(Ui.Width, 20000);
-        try
-        {
-            isSmall = Globals.IsSmall(Ui.Width, Ui.Height);
-            InvokeAsync(StateHasChanged);
-            InvokeAsync(ScrollLogToBottomAsync);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError("OnBrowserResize", $"Exception - {ex.Message}\r\n{ex}");
-        }
-
-        if (newIsSmall != isSmall)
-        {
-            isSmall = newIsSmall;
-            InvokeAsync(StateHasChanged);
-        }
-    }
-
-    public void Dispose()
-    {
-        Ui.OnChange -= HandleResize;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await LogRefreshLoopAsync(_cts.Token);
+            // Set up the log refresh task to update the log content when it changes
+            await LogRefreshAsync(_cts.Token);
 
             try
             {
+                // Scroll to the bottom of any log content that was already present
                 await ScrollLogToBottomAsync();
             }
             catch (Exception ex)
@@ -134,6 +114,7 @@
             }
         }
 
+        // If the log content has changed, scroll to the bottom of the log
         if (_logContentChanged)
         {
             _logContentChanged = false;
@@ -143,7 +124,41 @@
 
     #endregion
 
-    private async Task OnCancelButtonPressed()
+    #region External event handlers
+
+    /// <summary>
+    /// Handles the browser resize event.
+    /// </summary>
+    private async void OnBrowserResize()
+    {
+        try
+        {
+            isSmall = Globals.IsSmall(Ui.Width, Ui.Height);
+            await InvokeAsync(StateHasChanged);
+            await ScrollLogToBottomAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("HandleResize", $"Exception - {ex.Message}\r\n{ex}");
+        }
+    }
+
+    /// <summary>
+    /// Handles the state changed event.
+    /// </summary>
+    private async void OnStateChanged(object? sender, EventArgs e)
+    {
+        if (_disposed)
+            return;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    #endregion
+
+    #region Button handlers
+
+    private async Task CancelButtonPressed()
     {
         cancelAlpacaSpy.Cancel();
     }
@@ -156,12 +171,28 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    [JSInvokable]
-    public async Task OnBrowserResize(int width, int height)
+    private async Task ConnectDisconnectAsync()
     {
+        try
+        {
+            state.OperationUnderway = true;
+            await ConnectionManager.ChangeConnectedStateAsync(state, settings, logger, () => InvokeAsync(StateHasChanged));
+        }
+        finally
+        {
+            state.OperationUnderway = false;
+        }
     }
 
+    #endregion
+
+    #region Support code
+
+    /// <summary>
+    /// Scrolls the log content to the bottom.
+    /// </summary>
     private async Task ScrollLogToBottomAsync()
+
     {
         try
         {
@@ -179,20 +210,12 @@
         }
     }
 
-    private async Task ConnectDisconnectAsync()
-    {
-        try
-        {
-            state.OperationUnderway = true;
-            await ConnectionManager.ChangeConnectedStateAsync(state, settings, logger, () => InvokeAsync(StateHasChanged));
-        }
-        finally
-        {
-            state.OperationUnderway = false;
-        }
-    }
-
-    private async Task LogRefreshLoopAsync(CancellationToken token)
+    /// <summary>
+    /// Refreshes the log content periodically.
+    /// </summary>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    private async Task LogRefreshAsync(CancellationToken token)
     {
         try
         {
@@ -221,36 +244,10 @@
         }
     }
 
+    #endregion
 
-    private async void OnStateChanged(object? sender, EventArgs e)
-    {
-        if (_disposed)
-            return;
-
-        try
-        {
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (ObjectDisposedException)
-        {
-        }
-        catch (Exception ex)
-        {
-            LogConsole(ex.Message);
-        }
-    }
-
-    private void LogConsole(string message)
-    {
-        lock (Globals.writeLogLock)
-        {
-            Console.Write(DateTime.Now.ToString("HH:mm:ss.fff"));
-            Console.ForegroundColor = ConsoleColor.DarkCyan;
-            Console.WriteLine(message);
-            Console.ResetColor();
-        }
-    }
-
+    #region IAsyncDisposable implementation
+    
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
@@ -258,5 +255,8 @@
         _cts.Dispose();
         state.StateChanged -= OnStateChanged;
         settings.ConfigurationChanged -= OnStateChanged;
+        Ui.OnChange -= OnBrowserResize;
     }
+    
+    #endregion
 }
