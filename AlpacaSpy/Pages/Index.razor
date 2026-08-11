@@ -4,7 +4,6 @@
 @inject IJSRuntime JSRuntime
 @inject Settings settings
 @inject SessionState Ui
-
 @implements IAsyncDisposable
 
 <PageTitle>@Globals.APPLICATION_NAME</PageTitle>
@@ -12,6 +11,7 @@
 <div style="display:flex; flex-direction:column; height:100%; min-height:0;">
     @* Buttons and status *@
     <div>
+        @* Buttons*@
         @if (isSmall)
         {
             <span style="margin-right:24px;">
@@ -42,6 +42,8 @@
                               Style="border-radius:20px;" />
             </span>
         }
+
+        @* Status *@
         <span>
             @settings.Status
         </span>
@@ -69,31 +71,14 @@
     private int _lastLogLength;
     private string _cachedLogText = string.Empty;
     private readonly CancellationTokenSource _cts = new();
-    private DotNetObjectReference<Index>? objRef;
 
-    private async Task OnCancelButtonPressed()
-    {
-        cancelAlpacaSpy.Cancel();
-    }
+    private int FontSize { get { if (isSmall) return 13; return 14; } }
 
-    private async Task ClearScreen()
-    {
-        logger.ClearScreen();
-        _cachedLogText = string.Empty;
-        _lastLogLength = 0;
-        await InvokeAsync(StateHasChanged);
-    }
-    private int fontSize = 14;
-    private int FontSize 
-    { 
-        get
-        {
-            if (isSmall)
-                return 13;
-            return 14;
-        }
-    }
-    protected override void OnInitialized()
+    private string ApplicationLog { get => _cachedLogText; set { } }
+
+    #region Lifecycle event handlers
+
+    protected override async Task OnInitializedAsync()
     {
         Ui.OnChange += HandleResize;
         state.CancellationToken = cancelAlpacaSpy.Token;
@@ -110,6 +95,16 @@
     private void HandleResize()
     {
         bool newIsSmall = Globals.IsSmall(Ui.Width, 20000);
+        try
+        {
+            isSmall = Globals.IsSmall(Ui.Width, Ui.Height);
+            InvokeAsync(StateHasChanged);
+            InvokeAsync(ScrollLogToBottomAsync);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("OnBrowserResize", $"Exception - {ex.Message}\r\n{ex}");
+        }
 
         if (newIsSmall != isSmall)
         {
@@ -127,24 +122,15 @@
     {
         if (firstRender)
         {
-            _ = LogRefreshLoopAsync(_cts.Token);
+            await LogRefreshLoopAsync(_cts.Token);
 
             try
             {
-                objRef = DotNetObjectReference.Create(this);
-                await JSRuntime.InvokeVoidAsync("window.registerIndexViewportChangeCallback", objRef);
-                // logger.LogBlankLine();
                 await ScrollLogToBottomAsync();
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex)
             {
-                logger.LogWarning("Index", $"Interactive startup is not ready: {ex.Message}");
-            }
-            catch (JSDisconnectedException)
-            {
-            }
-            catch (TaskCanceledException)
-            {
+                logger.LogError("Index", $"Error scrolling to bottom of log: {ex.Message}\r\n{ex}");
             }
         }
 
@@ -152,6 +138,44 @@
         {
             _logContentChanged = false;
             await ScrollLogToBottomAsync();
+        }
+    }
+
+    #endregion
+
+    private async Task OnCancelButtonPressed()
+    {
+        cancelAlpacaSpy.Cancel();
+    }
+
+    private async Task ClearScreen()
+    {
+        logger.ClearScreen();
+        _cachedLogText = string.Empty;
+        _lastLogLength = 0;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnBrowserResize(int width, int height)
+    {
+    }
+
+    private async Task ScrollLogToBottomAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("ScrollToBottom", "AlpacaSpyLog");
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning("Index", $"Log scroll is not ready: {ex.Message}");
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (TaskCanceledException)
+        {
         }
     }
 
@@ -197,13 +221,6 @@
         }
     }
 
-    private string ApplicationLog
-    {
-        get => _cachedLogText;
-        set
-        {
-        }
-    }
 
     private async void OnStateChanged(object? sender, EventArgs e)
     {
@@ -234,38 +251,6 @@
         }
     }
 
-    [JSInvokable]
-    public async Task OnResizeIndex(int width, int height)
-    {
-        try
-        {
-            await InvokeAsync(StateHasChanged);
-            await ScrollLogToBottomAsync();
-        }
-        catch (Exception ex)
-        {
-            logger.LogError("OnResize", $"Exception - {ex.Message}\r\n{ex}");
-        }
-    }
-
-    private async Task ScrollLogToBottomAsync()
-    {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("ScrollToBottom", "AlpacaSpyLog");
-        }
-        catch (InvalidOperationException ex)
-        {
-            logger.LogWarning("Index", $"Log scroll is not ready: {ex.Message}");
-        }
-        catch (JSDisconnectedException)
-        {
-        }
-        catch (TaskCanceledException)
-        {
-        }
-    }
-
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
@@ -273,24 +258,5 @@
         _cts.Dispose();
         state.StateChanged -= OnStateChanged;
         settings.ConfigurationChanged -= OnStateChanged;
-
-        if (objRef != null)
-        {
-            try
-            {
-                await JSRuntime.InvokeVoidAsync("window.unregisterIndexViewportChangeCallback");
-            }
-            catch (InvalidOperationException ex)
-            {
-                logger.LogWarning("Index", $"Viewport cleanup is not ready: {ex.Message}");
-            }
-            catch (JSDisconnectedException)
-            {
-            }
-            catch (TaskCanceledException)
-            {
-            }
-            objRef.Dispose();
-        }
     }
 }

@@ -152,30 +152,63 @@ namespace AlpacaSpy
 
         #endregion
 
+        #region Public events
+
+        public event EventHandler? ConfigurationChanged;
+
+        #endregion
+
+        #region Public properties
+
         public ConsoleVisibility ConsoleAppearance { get; set; } = ConsoleVisibility.Hidden;
 
         public bool UpdateCheck { get; set; } = true;
 
         public List<ConfiguredDevice> ConfiguredDevices { get; set; } = new();
+
         public bool LogDiscoveryMessages { get; set; } = false;
+
         public bool StartBrowserOnLaunch { get; set; } = true;
+
         public double AlpacaDiscoveryDuration { get; set; } = Globals.ALPACA_DISCOVERY_DURATION_SECONDS;
+
         public int AlpacaGetPropertyTimeout { get; set; } = 2;
+
         public bool AutoConnect { get; set; } = true;
+
         public int AlpacaConnectTimeout { get; set; } = 10;
+
         public bool IncludeAlpacaTrace { get; set; } = false;
+
         public int SettingsCompatibilityVersion { get; set; } = SETTINGS_COMPATIBILTY_VERSION;
+
         public LogLevel LogLevel { get; set; } = LogLevel.Information;
+
         public string Location { get; set; } = "My Observatory";
+
         public ushort ServerPort { get; set; } = (ushort)Globals.DEFAULT_ALPACA_PORT;
+
         public bool BindToAllNetworkAddresses { get; set; } = true;
+
         public bool AllowDiscovery { get; set; } = true;
+
         public bool SendDiscoveryResponsesOnAllNetworks { get; set; } = true;
+
         public bool RunInStrictAlpacaMode { get; set; } = true;
 
         public bool PlaybackExpandJson { get; set; } = false;
 
         public int MaximumRecordingFileEntries { get; set; } = Globals.MAXIMUM_RECORDING_FILE_ENTRIES;
+
+        #endregion
+
+        #region Internal properties
+
+        internal string Status { get; private set; } = string.Empty;
+
+        #endregion
+
+        #region Public methods
 
         public void ResetToDefaults()
         {
@@ -226,11 +259,6 @@ namespace AlpacaSpy
             }
         }
 
-        internal string SettingsFileName { get; private set; } = string.Empty;
-        internal string Status { get; private set; } = string.Empty;
-
-        public event EventHandler? ConfigurationChanged;
-
         public void LogMessage(LogLevel logLevel, string message)
         {
             try
@@ -271,6 +299,12 @@ namespace AlpacaSpy
                 Console.WriteLine($"Settings.LogMessage Exception: {ex.Message}\r\n{ex}");
             }
         }
+
+        #endregion
+
+        #region Support code
+
+        private string SettingsFileName { get; set; } = string.Empty;
 
         private void CopyPropertiesFrom(Settings source)
         {
@@ -322,6 +356,10 @@ namespace AlpacaSpy
                 SelectiveLoggingMetadata.NormalizeDeviceSelection(device);
         }
 
+        #endregion
+
+        #region IDisposable support
+
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue)
@@ -340,5 +378,8 @@ namespace AlpacaSpy
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
+
+        #endregion
+
     }
 }

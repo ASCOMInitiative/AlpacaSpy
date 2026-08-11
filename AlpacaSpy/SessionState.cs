@@ -13,6 +13,5 @@
             Height = height;
             OnChange?.Invoke();
         }
-
     }
 }

@@ -28,42 +28,6 @@
 </HeadContent>
 
 <script>
-    let dotNetHelperIndexPage;
-
-    function onResizeIndex() {
-        if (dotNetHelperIndexPage) {
-            dotNetHelperIndexPage.invokeMethodAsync('OnResizeIndex', window.innerWidth, window.innerHeight);
-        }
-    }
-
-    window.registerIndexViewportChangeCallback = (dotnetHelperObject) => {
-        dotNetHelperIndexPage = dotnetHelperObject;
-        window.addEventListener('resize', onResizeIndex);
-    }
-
-    window.unregisterIndexViewportChangeCallback = () => {
-        window.removeEventListener('resize', onResizeIndex);
-        dotNetHelperIndexPage = null;
-    }
-
-    let dotNetHelperSetupPage;
-
-    function onResizeSetup() {
-        if (dotNetHelperSetupPage) {
-            dotNetHelperSetupPage.invokeMethodAsync('OnResizeSetup', window.innerWidth, window.innerHeight);
-        }
-    }
-
-    window.registerSetupViewportChangeCallback = (dotnetHelperObject) => {
-        dotNetHelperSetupPage = dotnetHelperObject;
-        window.addEventListener('resize', onResizeSetup);
-    }
-
-    window.unregisterSetupViewportChangeCallback = () => {
-        window.removeEventListener('resize', onResizeSetup);
-        dotNetHelperSetupPage = null;
-    }
-
     function ScrollToBottom(elementId) {
         const element = document.getElementById(elementId);
         if (!element) {

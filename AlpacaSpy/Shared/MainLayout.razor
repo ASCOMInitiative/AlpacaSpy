@@ -1,4 +1,4 @@
-@inject SessionState Ui
+@inject SessionState sessionState
 @inject IJSRuntime JS
 
 @namespace AlpacaSpy
@@ -37,6 +37,6 @@
     [JSInvokable]
     public void OnBrowserResize(int width, int height)
     {
-        Ui.SetSize(width, height);
+        sessionState.SetSize(width, height);
     }
 }

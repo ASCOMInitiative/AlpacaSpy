@@ -8,7 +8,10 @@ namespace AlpacaSpy
 {
     public class State
     {
-        private static uint serverTransactionId;
+        // Server's transaction id that is returned by GetServerTransactionId() and incremented for each new transaction.
+        private static uint serverTransactionId = 0;
+
+        #region Initialiser
 
         public State()
         {
@@ -18,7 +21,17 @@ namespace AlpacaSpy
             InstanceId = RandomHex10Secure();
         }
 
-        public CancellationToken CancellationToken = CancellationToken.None;
+        #endregion
+
+        #region Public events
+
+        public event EventHandler? StateChanged;
+
+        #endregion
+
+        #region Public properties
+
+        public CancellationToken CancellationToken { get; set; } = CancellationToken.None;
 
         public string InstanceId { get; set; }
 
@@ -65,6 +78,10 @@ namespace AlpacaSpy
 
         public bool DiscoveryHasRun { get; set; } = false;
 
+        #endregion
+
+        #region Public methods
+
         public uint GetServerTransactionId()
         {
             return Interlocked.Increment(ref serverTransactionId);
@@ -102,13 +119,13 @@ namespace AlpacaSpy
             }
         }
 
-        public event EventHandler? StateChanged;
-
         private static string RandomHex10Secure()
         {
             byte[] bytes = new byte[5];
             RandomNumberGenerator.Fill(bytes);
             return Convert.ToHexString(bytes).ToLower();
         }
+
+        #endregion
     }
 }
