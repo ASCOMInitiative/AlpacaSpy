@@ -31,7 +31,7 @@ namespace AlpacaSpy
 
         internal const int MAXIMUM_RECORDING_FILE_ENTRIES = 100000;
 
-        internal const string IMAGEBYTES_PROXY_RESPONSE = @"{""Value"": ""ImageArray response not recorded or checked due to length and JSON/ImageBytes complexity."", ""ClientTransactionID"": 1, ""ServerTransactionID"": 1, ""ErrorNumber"": 0, ""ErrorMessage"": """"}";
+        internal const string IMAGEBYTES_PROXY_RESPONSE = @"{""Value"": ""ImageArray/ImageArrayVariant response not recorded or checked due to length and JSON/ImageBytes complexity."", ""ClientTransactionID"": 1, ""ServerTransactionID"": 1, ""ErrorNumber"": 0, ""ErrorMessage"": """"}";
 
         internal const string GITHUB_OWNER = "ASCOMInitiative"; // "Peter-Simpson";//"ASCOMInitiative";
         internal const string GITHUB_REPOSITORY = "AlpacaSpy"; // "ReleaseTester"; // "AlpacaSpy";
