@@ -51,6 +51,7 @@ namespace AlpacaSpy
         {
             string path = context.Request.Path.Value ?? string.Empty;
             Match match = DeviceApiPattern.Match(path);
+
             // Only process paths that match the Alpaca API protocol, other paths are passed to the rest of the pipeline for processing
             if (!match.Success)
             {
@@ -77,8 +78,7 @@ namespace AlpacaSpy
             }
 
             // Get the specified device
-            ConfiguredDevice? device = state.ConfiguredDevices.FirstOrDefault(d =>
-                d.DeviceType == deviceType && d.ProxyDeviceNumber == proxyDeviceNumber);
+            ConfiguredDevice? device = state.ConfiguredDevices.FirstOrDefault(d => d.DeviceType == deviceType && d.ProxyDeviceNumber == proxyDeviceNumber);
 
             // Validate that we got a device i.e. that we are proxying the specified device
             if (device == null) // We are not proxying this device so reject the request
@@ -87,6 +87,7 @@ namespace AlpacaSpy
                 return;
             }
 
+            // Validate that the device is connected
             if (!state.Connected)
             {
                 await ReturnAlpacaErrorAsync(context, 1027, $"{Globals.APPLICATION_SHORT_NAME} is not connected.", StatusCodes.Status200OK);
@@ -111,82 +112,48 @@ namespace AlpacaSpy
             using HttpRequestMessage forwardRequest = BuildForwardRequest(context, targetUrl, requestBodyBytes);
 
             // Send the message to the device and wait for its response.
-            HttpResponseMessage responseMessage;
-            byte[] responseBytes;
             try
             {
                 // Record the time that the request was sent to the device
                 DateTime requestSentToDevice = DateTime.Now;
 
-                // Send the request to the device and read the response content into a byte array
-                responseMessage = await client.SendAsync(forwardRequest, HttpCompletionOption.ResponseContentRead);
-                responseBytes = await responseMessage.Content.ReadAsByteArrayAsync();
+                // Read headers first so imagebytes responses can be relayed without loading their complete payload into memory.
+                using HttpResponseMessage responseMessage = await client.SendAsync(
+                    forwardRequest,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    context.RequestAborted);
 
                 // Record the time that the response was received from the device
                 DateTime responseFromDevice = DateTime.Now;
 
-                // Record the transaction if configured to do so
-                if (device.RecordTransactions)
+                // Check whether this is an ImageBytes response, which is a special case that must be streamed to the client without buffering the entire payload in memory.
+                if (IsImageBytesResponse(responseMessage)) // This is an ImageBytes response.
                 {
-                    AlpacaTransaction transaction = new AlpacaTransaction()
-                    {
-                        RequestMethod = context.Request.Method,
-                        RequestUri = context.Request.Path + context.Request.QueryString,
-                        RequestHeaders = device.RecordClientHeaders ? context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()) : new(),
-                        RequestHttpVersion = context.Request.Protocol switch
-                        {
-                            "HTTP/1.0" => new Version(1, 0),
-                            "HTTP/1.1" => new Version(1, 1),
-                            "HTTP/2" => new Version(2, 0),
-                            _ => new Version(1, 1)
-                        },
-                        RequestBody = requestBodyBytes.Length > 0 ? Encoding.UTF8.GetString(requestBodyBytes) : "",
-                        RequestTimeSent = requestSentToDevice,
-                        ResponseStatusCode = responseMessage.StatusCode,
-                        ResponseHttpVersion = responseMessage.Version,
-                        ResponseHeaders = device.RecordDeviceHeaders ? responseMessage.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()) : new(),
-                        ResponseTime = responseFromDevice - requestSentToDevice,
-                    };
+                    // Record the transaction with a null response body, since we are not buffering the entire payload in memory.
+                    if (device.RecordTransactions)
+                        RecordTransaction(device, context, requestBodyBytes, requestSentToDevice, responseFromDevice, responseMessage, null, method);
 
-                    // Handle ImageArray and ImageArrayVariant responses differently to everything else
-                    string responseString = responseBytes.Length > 0 ? Encoding.UTF8.GetString(responseBytes) : "";
-                    try
-                    {
-                        JsonDocument document = JsonDocument.Parse(responseString);
-                        transaction.Response = document;
-                    }
-                    catch // The supplied string was not parseable into a JSON string so create a valid JSON document that contains the response string as a plain string value
-                    {
-                        if (!method.Contains("imagearray")) // Normal action, this is not an ImageArray or ImageArrayVariant request
-                        {
-                            // Ensure that this reporting mechanic does not interrupt recording if it fails.
-                            try
-                            {
-                                // Create a JSON string containing the response string as a property value. 
-                                // NOTE: This tricky piece of code works by creating a temporary anonymous object, assigning responseString's value to its property "UnparsableResponse" and then serializing that object into a JSON string.
-                                string json = JsonSerializer.Serialize(new
-                                {
-                                    UnparsableResponse = responseString
-                                });
-
-                                // Parse the JSON string into a JSON document and save it
-                                JsonDocument document = JsonDocument.Parse(json);
-                                transaction.Response = document;
-                            }
-                            catch (Exception ex)
-                            {
-                                logger.LogError("AlpacaProxyMiddleware", $"Error parsing response: {responseString}\r\n{ex}");
-                            }
-                        }
-                        else // This is likely an ImageArray or ImageArrayVariant ImageBytes response so provide a proxy for recording purposes.
-                        {
-                            transaction.Response = JsonDocument.Parse(Globals.IMAGEBYTES_PROXY_RESPONSE);
-                        }
-                    }
-
-                    // Save the transaction for later replaying
-                    state.Transactions[device].Add(transaction);
+                    // COpy the device response to the client response stream without buffering the entire payload in memory.
+                    CopyResponseMetadata(context, responseMessage); // Copy the device response metadata (status code, headers) to the client
+                    await StreamImageResponseAsync(context, responseMessage, device, logThisCall); // Stream the device response body to the client without buffering the entire payload in memory
+                    return;
                 }
+
+                // Handle non-ImageBytes responses by reading the entire response body into memory, logging it, and forwarding it to the client.
+                byte[] responseBytes = await responseMessage.Content.ReadAsByteArrayAsync(context.RequestAborted); // Read the entire response
+                responseFromDevice = DateTime.Now;
+
+                // Record the transaction with the response body
+                if (device.RecordTransactions)
+                    RecordTransaction(device, context, requestBodyBytes, requestSentToDevice, responseFromDevice, responseMessage, responseBytes, method);
+
+                // Log device's response if configured to do so
+                if (logThisCall)
+                    LogDeviceResponse(responseMessage, responseBytes, device);
+
+                // Forward the response to the client
+                CopyResponseMetadata(context, responseMessage); // Copy the device response metadata (status code, headers) to the client
+                await context.Response.Body.WriteAsync(responseBytes, context.RequestAborted); // Copy the device response body to the client
             }
             catch (Exception ex)
             {
@@ -195,38 +162,11 @@ namespace AlpacaSpy
                     logger.LogError("Proxy", $"Forward error → {device.Name} ({targetUrl}): {ex.Message}");
                     logger.LogDebug("Proxy", ex.ToString());
                 }
-                await ReturnAlpacaErrorAsync(context, 1024, $"AlpacaSpy proxy error: {ex.Message}");
-                return;
-            }
 
-            // Dispose responseMessage promptly once we are done with it 
-            using (responseMessage)
-            {
-                // Log device's response
-                if (logThisCall)
-                    LogDeviceResponse(responseMessage, responseBytes, device);
-
-                // Forward response to the original client
-
-                // Set the HTTP status
-                context.Response.StatusCode = (int)responseMessage.StatusCode;
-
-                // Add the response headers
-                foreach (KeyValuePair<string, IEnumerable<string>> header in responseMessage.Headers)
-                {
-                    if (!HopByHopHeaders.Contains(header.Key))
-                        context.Response.Headers[header.Key] = header.Value.ToArray();
-                }
-
-                // Add response content headers
-                foreach (KeyValuePair<string, IEnumerable<string>> header in responseMessage.Content.Headers)
-                {
-                    if (!HopByHopHeaders.Contains(header.Key))
-                        context.Response.Headers[header.Key] = header.Value.ToArray();
-                }
-
-                // Send the response to the client.
-                await context.Response.Body.WriteAsync(responseBytes);
+                if (context.Response.HasStarted)
+                    context.Abort();
+                else
+                    await ReturnAlpacaErrorAsync(context, 1024, $"AlpacaSpy proxy error: {ex.Message}");
             }
         }
 
@@ -275,6 +215,139 @@ namespace AlpacaSpy
             }
 
             return request;
+        }
+
+        /// <summary>
+        /// Determines whether the given HttpResponseMessage is an ImageBytes response, which is a special case that must be streamed to the client without buffering the entire payload in memory.
+        /// </summary>
+        /// <param name="response">The HttpResponseMessage to check.</param>
+        /// <returns>True if the response is an ImageBytes response; otherwise, false.</returns>
+        private static bool IsImageBytesResponse(HttpResponseMessage response)
+        {
+            return string.Equals(response.Content.Headers.ContentType?.MediaType, "application/imagebytes", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Copies the metadata (status code and headers) from the given HttpResponseMessage to the HttpContext.Response, excluding hop-by-hop headers.
+        /// </summary>
+        /// <param name="context">The HttpContext to which the response metadata will be copied.</param>
+        /// <param name="responseMessage">The HttpResponseMessage from which to copy the metadata.</param>
+        private static void CopyResponseMetadata(HttpContext context, HttpResponseMessage responseMessage)
+        {
+            context.Response.StatusCode = (int)responseMessage.StatusCode;
+
+            // Process the HTTP headers
+            foreach (KeyValuePair<string, IEnumerable<string>> header in responseMessage.Headers)
+            {
+                if (!HopByHopHeaders.Contains(header.Key))
+                    context.Response.Headers[header.Key] = header.Value.ToArray();
+            }
+
+            // Process the HTTP content headers
+            foreach (KeyValuePair<string, IEnumerable<string>> header in responseMessage.Content.Headers)
+            {
+                if (!HopByHopHeaders.Contains(header.Key))
+                    context.Response.Headers[header.Key] = header.Value.ToArray();
+            }
+        }
+
+        /// <summary>
+        /// Streams the response body of an ImageBytes response from the device to the client without buffering the entire payload in memory, while also logging the first 50 bytes of the response for debugging purposes.
+        /// </summary>
+        /// <param name="context">The HttpContext to which the response will be streamed.</param>
+        /// <param name="responseMessage">The HttpResponseMessage containing the ImageBytes response.</param>
+        /// <param name="device">The ConfiguredDevice from which the response was received.</param>
+        /// <param name="logThisCall">A boolean indicating whether to log the first 50 bytes of the response.</param>
+        /// <returns>A Task representing the asynchronous operation.</returns>
+        private async Task StreamImageResponseAsync(HttpContext context, HttpResponseMessage responseMessage, ConfiguredDevice device, bool logThisCall)
+        {
+            const int BufferSize = 81920;
+            byte[] buffer = new byte[BufferSize];
+            byte[] prefix = new byte[50];
+            int prefixLength = 0;
+
+            using Stream responseStream = await responseMessage.Content.ReadAsStreamAsync(context.RequestAborted);
+
+            int bytesRead;
+            while ((bytesRead = await responseStream.ReadAsync(buffer, context.RequestAborted)) > 0)
+            {
+                if (prefixLength < 50)
+                {
+                    int bytesToCopy = Math.Min(prefix.Length - prefixLength, bytesRead);
+                    Buffer.BlockCopy(buffer, 0, prefix, prefixLength, bytesToCopy);
+                    prefixLength += bytesToCopy;
+                }
+
+                await context.Response.Body.WriteAsync(buffer.AsMemory(0, bytesRead), context.RequestAborted);
+            }
+
+            if (logThisCall)
+                LogImageResponse(responseMessage, prefix.AsSpan(0, prefixLength), device);
+        }
+
+        private void RecordTransaction(
+            ConfiguredDevice device,
+            HttpContext context,
+            byte[] requestBodyBytes,
+            DateTime requestSentToDevice,
+            DateTime responseFromDevice,
+            HttpResponseMessage responseMessage,
+            byte[]? responseBytes,
+            string method)
+        {
+            AlpacaTransaction transaction = new()
+            {
+                RequestMethod = context.Request.Method,
+                RequestUri = context.Request.Path + context.Request.QueryString,
+                RequestHeaders = device.RecordClientHeaders ? context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()) : new(),
+                RequestHttpVersion = context.Request.Protocol switch
+                {
+                    "HTTP/1.0" => new Version(1, 0),
+                    "HTTP/1.1" => new Version(1, 1),
+                    "HTTP/2" => new Version(2, 0),
+                    _ => new Version(1, 1)
+                },
+                RequestBody = requestBodyBytes.Length > 0 ? Encoding.UTF8.GetString(requestBodyBytes) : "",
+                RequestTimeSent = requestSentToDevice,
+                ResponseStatusCode = responseMessage.StatusCode,
+                ResponseHttpVersion = responseMessage.Version,
+                ResponseHeaders = device.RecordDeviceHeaders ? responseMessage.Headers.ToDictionary(h => h.Key, h => h.Value.ToArray<string>()) : new(),
+                ResponseTime = responseFromDevice - requestSentToDevice,
+            };
+
+            if (responseBytes is null)
+            {
+                transaction.Response = JsonDocument.Parse(Globals.IMAGEBYTES_PROXY_RESPONSE);
+            }
+            else
+            {
+                string responseString = responseBytes.Length > 0 ? Encoding.UTF8.GetString(responseBytes) : string.Empty;
+                try
+                {
+                    transaction.Response = JsonDocument.Parse(responseString);
+                }
+                catch (JsonException)
+                {
+                    if (method.Contains("imagearray", StringComparison.OrdinalIgnoreCase))
+                    {
+                        transaction.Response = JsonDocument.Parse(Globals.IMAGEBYTES_PROXY_RESPONSE);
+                    }
+                    else
+                    {
+                        try
+                        {
+                            string json = JsonSerializer.Serialize(new { UnparsableResponse = responseString });
+                            transaction.Response = JsonDocument.Parse(json);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError("AlpacaProxyMiddleware", $"Error parsing response: {responseString}\r\n{ex}");
+                        }
+                    }
+                }
+            }
+
+            state.Transactions[device].Add(transaction);
         }
 
         private void LogClientRequest(HttpContext context, ConfiguredDevice device, byte[] bodyBytes, string method)
@@ -367,6 +440,26 @@ namespace AlpacaSpy
                     sb.AppendLine($"    Unable to parse device response: {Encoding.UTF8.GetString(responseBytes)}");
                     sb.AppendLine($"      Exception: {ex.Message}");
                 }
+            }
+
+            WriteToLogs(device, $"{sb.ToString().TrimEnd()}\r\n");
+        }
+
+        private void LogImageResponse(HttpResponseMessage response, ReadOnlySpan<byte> prefix, ConfiguredDevice device)
+        {
+            StringBuilder sb = new();
+            sb.Append($"◄── {(int)response.StatusCode} {response.ReasonPhrase} -");
+            for (int i = 0; i < prefix.Length; i++)
+                sb.Append($" [{prefix[i]:X2}]");
+            sb.AppendLine();
+
+            if (device.LogDeviceHeaders)
+            {
+                sb.AppendLine("  DEVICE RESPONSE HEADERS:");
+                foreach (KeyValuePair<string, IEnumerable<string>> h in response.Headers)
+                    sb.AppendLine($"    {h.Key}: {string.Join(", ", h.Value)}");
+                foreach (KeyValuePair<string, IEnumerable<string>> h in response.Content.Headers)
+                    sb.AppendLine($"    {h.Key}: {string.Join(", ", h.Value)}");
             }
 
             WriteToLogs(device, $"{sb.ToString().TrimEnd()}\r\n");
