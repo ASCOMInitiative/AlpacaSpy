@@ -12,6 +12,7 @@ namespace AlpacaSpy
         private const int SETTINGS_COMPATIBILTY_VERSION = 1;
         private bool disposedValue;
         private readonly int settingsFileVersion;
+        private readonly Lock settingsPersistenceLock = new();
         private static readonly JsonSerializerOptions jsonSerialisationOptions;
 
         #region Initiators
@@ -215,11 +216,13 @@ namespace AlpacaSpy
             try
             {
                 Settings defaults = new Settings();
-                string serialisedSettings = JsonSerializer.Serialize(defaults, jsonSerialisationOptions);
-                Directory.CreateDirectory(Path.GetDirectoryName(SettingsFileName) ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Globals.APPLICATION_FOLDER_NAME));
-                File.WriteAllText(SettingsFileName, serialisedSettings);
-                CopyPropertiesFrom(defaults);
-                EnsureDefaults();
+                lock (settingsPersistenceLock)
+                {
+                    string serialisedSettings = JsonSerializer.Serialize(defaults, jsonSerialisationOptions);
+                    WriteSettingsAtomically(serialisedSettings);
+                    CopyPropertiesFrom(defaults);
+                    EnsureDefaults();
+                }
                 RaiseChangeEvent();
                 Status = $"Settings reset at {DateTime.Now:HH:mm:ss}.";
             }
@@ -233,8 +236,12 @@ namespace AlpacaSpy
         public void Save()
         {
             LogMessage(LogLevel.Debug, "Saving settings to settings file");
-            EnsureDefaults();
-            bool saved = PersistSettings();
+            bool saved;
+            lock (settingsPersistenceLock)
+            {
+                EnsureDefaults();
+                saved = PersistSettings();
+            }
             Status = saved
                 ? $"Settings saved at {DateTime.Now:HH:mm:ss}."
                 : $"ERROR: Settings could not be saved at {DateTime.Now:HH:mm:ss}.";
@@ -331,9 +338,7 @@ namespace AlpacaSpy
                 SettingsCompatibilityVersion = SETTINGS_COMPATIBILTY_VERSION;
                 LogMessage(LogLevel.Debug, $"PersistSettings - Settings file: {SettingsFileName}");
                 string serialisedSettingsString = JsonSerializer.Serialize(this, jsonSerialisationOptions);
-                Directory.CreateDirectory(Path.GetDirectoryName(SettingsFileName) ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Globals.APPLICATION_FOLDER_NAME));
-                LogMessage(LogLevel.Debug, $"PersistSettings - Created directory. Writing to {SettingsFileName}");
-                File.WriteAllText(SettingsFileName, serialisedSettingsString);
+                WriteSettingsAtomically(serialisedSettingsString);
                 return true;
             }
             catch (Exception ex)
@@ -354,6 +359,25 @@ namespace AlpacaSpy
 
             foreach (ConfiguredDevice device in ConfiguredDevices)
                 SelectiveLoggingMetadata.NormalizeDeviceSelection(device);
+        }
+
+        private void WriteSettingsAtomically(string serialisedSettings)
+        {
+            string settingsDirectory = Path.GetDirectoryName(SettingsFileName) ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Globals.APPLICATION_FOLDER_NAME);
+            Directory.CreateDirectory(settingsDirectory);
+
+            string temporaryFileName = Path.Combine(settingsDirectory, $".{Path.GetFileName(SettingsFileName)}.{Guid.NewGuid():N}.tmp");
+            try
+            {
+                LogMessage(LogLevel.Debug, $"Writing settings atomically to {SettingsFileName}");
+                File.WriteAllText(temporaryFileName, serialisedSettings);
+                File.Move(temporaryFileName, SettingsFileName, true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryFileName))
+                    File.Delete(temporaryFileName);
+            }
         }
 
         #endregion

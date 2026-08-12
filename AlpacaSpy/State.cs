@@ -97,10 +97,11 @@ namespace AlpacaSpy
             ConnectingToDevices = false;
             ApplicationLog = new StringBuilder(Globals.MAXIMUM_LOG_SIZE_CHARACTERS, Globals.MAXIMUM_LOG_SIZE_CHARACTERS).Append($"{Globals.WELCOME_MESSAGE}\r\n");
             ConfiguredDevices = new List<ConfiguredDevice>();
-            ProxyDevices = new List<object>();
             foreach (TraceLogger tl in DeviceLoggers.Values) try { tl.Dispose(); } catch { }
             foreach (IDisposable device in ProxyDevices) try { device.Dispose(); } catch { }
             DeviceLoggers = new Dictionary<string, TraceLogger>();
+            ProxyDevices = new List<object>();
+            Transactions = new Dictionary<ConfiguredDevice, FixedCapacityList<AlpacaTransaction>>(Globals.MAXIMUM_RECORDING_FILE_ENTRIES);
             lock (DiscoveredDevicesLock)
             {
                 DiscoveredDevices = new List<ASCOM.Alpaca.Discovery.AscomDevice>();
