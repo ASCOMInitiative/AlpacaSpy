@@ -26,7 +26,7 @@ namespace AlpacaSpy
 
         internal const int DISCONNECTED_CIRCUIT_RETENTION_PERIOD = 180;
         internal const int LOG_REFRESH_INTERVAL = 250;
-        internal const int MAX_CONFIGURED_DEVICES = 10;
+        internal const int MAX_CONFIGURED_DEVICES = 20;
         internal const double ALPACA_DISCOVERY_DURATION_SECONDS = 1.0;
 
         internal const int MAXIMUM_RECORDING_FILE_ENTRIES = 100000;

@@ -273,7 +273,7 @@
             }
             else
             {
-                <div class="empty">No @(State.ReplayTargetDevice is not null?  State.ReplayTargetDevice.DeviceType:"") JSON files</div>
+                <div class="empty">No @(State.ReplayTargetDevice is not null ? State.ReplayTargetDevice.DeviceType : "") JSON files</div>
             }
         </div>
     </div>
@@ -285,6 +285,9 @@
     const string ELEMENT_MISSING_IN_ONE_RESPONSE = "ELEMENT MISSING IN ONE RESPONSE";
     const string ELEMENT_MISSING_IN_BOTH_RESPONSES = "ELEMENT MISSING IN BOTH RESPONSES";
     static readonly string[] ReplayMismatchMessages = { VALUES_DIFFERENT_MESSAGE, ELEMENT_MISSING_IN_ONE_RESPONSE, ELEMENT_MISSING_IN_BOTH_RESPONSES };
+
+    // Create a regex to extract the device type, device number and method from the request URI.
+    static readonly Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/(?<DeviceNumber>[\d+])\/(?<Method>[^\/\?]+)\?*(?<Parameters>.*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // Define the list of properties to compare between the original recording and the current device response
     static readonly string[] RESPONSE_PROPERTIES_TO_COMARE = { "Value", "ClientTransactionID", "ErrorNumber", "ErrorMessage" };
@@ -331,6 +334,12 @@
         if (string.IsNullOrEmpty(selectedFile) || !File.Exists(selectedFile))
         {
             Logger.LogError("ReplayTransactions", "No file selected or file does not exist.");
+            return;
+        }
+
+        if (!State.TryStartReplay(out CancellationToken replayCancellationToken))
+        {
+            await DialogService.Alert("A replay operation is already in progress.", "Unable to Replay", null);
             return;
         }
 
@@ -463,11 +472,6 @@
             HttpClient client = HttpClientFactory.CreateClient();
 
             // Create a regex to extract the device type and method from the request URI.
-            Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/\d+\/(?<Method>[^\/\?]+)", RegexOptions.IgnoreCase);
-
-            // Set time counters for the original file and the current playback
-            //TimeSpan timeSinceRecodingStart = TimeSpan.FromSeconds(0.0);
-            //TimeSpan timeSincePlaybackStart = TimeSpan.FromSeconds(0.0);
 
             // Initialise start times for the recoding and playback
             DateTime startOfRecording = transactions.Count > 0 ? transactions[0].RequestTimeSent : DateTime.MinValue;  // Initialise the time at which the original recording started from the first transaction if it exists
@@ -484,216 +488,228 @@
 
                 // Check whether we got a value
                 string methodName = "UnknownMethod";
+                int deviceNumber = 0;
+                string deviceType = "UnknownDeviceType";
+                string parameters = string.Empty;
+
                 if (match.Success) // Got a match OK
                 {
-                    // Extract the device type as a string
+                    // static readonly Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/(?<DeviceNumber>[\d+])\/(?<Method>[^\/\?]+)\?(?<Parameters>.*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+                    // Extract the device type, number and parameters from the URI
+                    deviceType = match.Groups["DeviceTypeString"].Value;
+                    deviceNumber = int.Parse(match.Groups["DeviceNumber"].Value);
                     methodName = match.Groups["Method"].Value;
-                }
+                    parameters = match.Groups["Parameters"].Value;
+                    // Create the target URI based on the targe device's IP address, port and Alpaca device number
+                    //string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}{transaction.RequestUri}";
+                    string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}/api/v1/{deviceType}/{State.ReplayTargetDevice?.RemoteDeviceNumber}/{methodName}?{parameters}";
 
-                // Create the target URI based on the targe device's IP address, port and Alpaca device number
-                string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}{transaction.RequestUri}";
+                    // Create the outgoing log message and save it for use if the device responds differently to the recorded outcome
+                    sendLogMessage = $"──► {transaction.RequestMethod} {CapitaliseMemberName(methodName)} - {targetUri}";
 
-                // Create the outgoing log message and save it for use if the device responds differently to the recorded outcome
-                sendLogMessage = $"──► {transaction.RequestMethod} {CapitaliseMemberName(methodName)} - {targetUri}";
+                    // Remember the device send time in case a mismatch occurs
+                    DateTime responseTime = DateTime.Now;
 
-                // Remember the device send time in case a mismatch occurs
-                DateTime responseTime = DateTime.Now;
+                    // Write the outgoing log message
+                    Logger.LogMessage("ReplayTransactions", sendLogMessage);
 
-                // Write the outgoing log message
-                Logger.LogMessage("ReplayTransactions", sendLogMessage);
+                    // Construct an HTTP request for the target device
+                    HttpRequestMessage request = new HttpRequestMessage(new HttpMethod(transaction.RequestMethod), targetUri);
 
-                // Construct an HTTP request for the target device
-                HttpRequestMessage request = new HttpRequestMessage(new HttpMethod(transaction.RequestMethod), targetUri);
-
-                // If the transaction contains a request body, add it and this transaction's content headers to the request
-                if (transaction.RequestBody != "") // The transaction does have a request body
-                {
-                    // Create a string content item based on the transaction's content
-                    Logger.LogDebug("ReplayTransactions", $"Request body is not empty string: {transaction.RequestBody}.");
-                    StringContent newContent = new StringContent(transaction.RequestBody, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
-
-                    // Check whether there is an existing content item (satisfied nullability requirements)
-                    if (request.Content is not null) // There is a request body so add it's headers to the original request
+                    // If the transaction contains a request body, add it and this transaction's content headers to the request
+                    if (transaction.RequestBody != "") // The transaction does have a request body
                     {
-                        // Iterate over the headers and add them to the new content
-                        foreach (KeyValuePair<string, IEnumerable<string>> header in request.Content.Headers)
+                        // Create a string content item based on the transaction's content
+                        Logger.LogDebug("ReplayTransactions", $"Request body is not empty string: {transaction.RequestBody}.");
+                        StringContent newContent = new StringContent(transaction.RequestBody, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
+
+                        // Check whether there is an existing content item (satisfied nullability requirements)
+                        if (request.Content is not null) // There is a request body so add it's headers to the original request
                         {
-                            // Copy header values to the new content (TryAddWithoutValidation is used to avoid validation issues)
-                            newContent.Headers.TryAddWithoutValidation(header.Key, header.Value);
-                            Logger.LogDebug("ReplayTransactions", $"Added header: {header.Key} = {header.Value}.");
+                            // Iterate over the headers and add them to the new content
+                            foreach (KeyValuePair<string, IEnumerable<string>> header in request.Content.Headers)
+                            {
+                                // Copy header values to the new content (TryAddWithoutValidation is used to avoid validation issues)
+                                newContent.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                                Logger.LogDebug("ReplayTransactions", $"Added header: {header.Key} = {header.Value}.");
+                            }
+                        }
+
+                        // Add the revised content to the request
+                        request.Content = newContent;
+                        Logger.LogDebug("ReplayTransactions", $"Added content: {transaction.RequestBody}.");
+                    }
+
+                    // Add any recorded request headers (as opposed to content headers) to the outgoing HttpRequestMessage.
+                    if (transaction.RequestHeaders != null)
+                    {
+                        // Try to add each request header to request.Headers .
+                        foreach (KeyValuePair<string, string[]> kvp in transaction.RequestHeaders)
+                        {
+                            var headerName = kvp.Key;
+                            var headerValues = kvp.Value ?? Array.Empty<string>();
+
+                            // Try general headers first
+                            if (request.Headers.TryAddWithoutValidation(headerName, headerValues)) // Added header OK
+                                Logger.LogDebug("ReplayTransactions", $"Added {kvp.Key} request header successfully.");
                         }
                     }
 
-                    // Add the revised content to the request
-                    request.Content = newContent;
-                    Logger.LogDebug("ReplayTransactions", $"Added content: {transaction.RequestBody}.");
-                }
+                    // Calculate time differentials
+                    TimeSpan timeSinceRecodingStart = transaction.RequestTimeSent.Subtract(startOfRecording); // .Add(TimeSpan.FromMilliseconds(50.0 * transactionNumber));
+                    TimeSpan timeSincePlaybackStart = DateTime.Now - startOfPlayback;
 
-                // Add any recorded request headers (as opposed to content headers) to the outgoing HttpRequestMessage.
-                if (transaction.RequestHeaders != null)
-                {
-                    // Try to add each request header to request.Headers .
-                    foreach (KeyValuePair<string, string[]> kvp in transaction.RequestHeaders)
+                    // Calculate the required delay in integer milliseconds, which is the time between this and the last transaction
+                    int delayMs = (int)timeSinceRecodingStart.Subtract(timeSincePlaybackStart).TotalMilliseconds;
+                    Logger.LogDebug("ReplayTransactions", $"Txn time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Calculated delay: {delayMs:0.0} milliseconds. Time since recording start: {timeSinceRecodingStart.TotalSeconds:0.000}," +
+                        $" Time since playback start: {timeSincePlaybackStart.TotalSeconds:0.000}");
+
+                    // Apply the delay if it is 1ms or more, otherwise do not wait
+                    if (delayMs >= 1)
+                        await Task.Delay(delayMs, replayCancellationToken);
+
+                    // Send the request to the target device and wait for a response
+                    await client.SendAsync(request, replayCancellationToken).ContinueWith(async responseTask =>
                     {
-                        var headerName = kvp.Key;
-                        var headerValues = kvp.Value ?? Array.Empty<string>();
-
-                        // Try general headers first
-                        if (request.Headers.TryAddWithoutValidation(headerName, headerValues)) // Added header OK
-                            Logger.LogDebug("ReplayTransactions", $"Added {kvp.Key} request header successfully.");
-                    }
-                }
-
-                // Calculate time differentials
-                TimeSpan timeSinceRecodingStart = transaction.RequestTimeSent.Subtract(startOfRecording); // .Add(TimeSpan.FromMilliseconds(50.0 * transactionNumber));
-                TimeSpan timeSincePlaybackStart = DateTime.Now - startOfPlayback;
-
-                // Calculate the required delay in integer milliseconds, which is the time between this and the last transaction
-                int delayMs = (int)timeSinceRecodingStart.Subtract(timeSincePlaybackStart).TotalMilliseconds;
-                Logger.LogDebug("ReplayTransactions", $"Txn time: {transaction.RequestTimeSent:HH:mm:ss.fff}, Calculated delay: {delayMs:0.0} milliseconds. Time since recording start: {timeSinceRecodingStart.TotalSeconds:0.000}," +
-                    $" Time since playback start: {timeSincePlaybackStart.TotalSeconds:0.000}");
-
-                // Apply the delay if it is 1ms or more, otherwise do not wait
-                if (delayMs >= 1)
-                    await Task.Delay(delayMs);
-
-                // Send the request to the target device and wait for a response
-                await client.SendAsync(request).ContinueWith(async responseTask =>
-                {
-                    try
-                    {
-                        var response = await responseTask;
-                        string responseString = await response.Content.ReadAsStringAsync();
-
-                        // Handle long ImageArray responses by replacing the response string with a placeholder message
-                        if (methodName.Contains("ImageArray", StringComparison.OrdinalIgnoreCase) & responseString.Length > 1000)
-                        {
-                            responseString = Globals.IMAGEBYTES_PROXY_RESPONSE;
-                        }
-
-                        string formattedString = responseString;
-
-                        // Pretty-print the device's current response
                         try
                         {
-                            if (Settings.PlaybackExpandJson)
+                            var response = await responseTask;
+                            string responseString = await response.Content.ReadAsStringAsync();
+
+                            // Handle long ImageArray responses by replacing the response string with a placeholder message
+                            if (methodName.Contains("ImageArray", StringComparison.OrdinalIgnoreCase) & responseString.Length > 1000)
                             {
-                                formattedString = JsonSerializer.Serialize(JsonSerializer.Deserialize<object>(responseString), new JsonSerializerOptions
+                                responseString = Globals.IMAGEBYTES_PROXY_RESPONSE;
+                            }
+
+                            string formattedString = responseString;
+
+                            // Pretty-print the device's current response
+                            try
+                            {
+                                if (Settings.PlaybackExpandJson)
                                 {
-                                    WriteIndented = true,
+                                    formattedString = JsonSerializer.Serialize(JsonSerializer.Deserialize<object>(responseString), new JsonSerializerOptions
+                                    {
+                                        WriteIndented = true,
+                                        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                                    });
+                                }
+                            }
+                            catch (Exception)
+                            {
+                                // Do nothing, formattedString retains its original value: responseString
+                            }
+
+                            // Create the incoming log message and save it for use if the device responds differently to the recorded outcome
+                            responseLogMessage = $"◄── {response.StatusCode} {formattedString}";
+                            Logger.LogMessage("ReplayTransactions", responseLogMessage);
+
+                            // Pretty-print the original response
+                            try
+                            {
+                                formattedString = JsonSerializer.Serialize(transaction.Response, new JsonSerializerOptions()
+                                {
+                                    WriteIndented = Settings.PlaybackExpandJson,
                                     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                                 });
                             }
-                        }
-                        catch (Exception)
-                        {
-                            // Do nothing, formattedString retains its original value: responseString
-                        }
-
-                        // Create the incoming log message and save it for use if the device responds differently to the recorded outcome
-                        responseLogMessage = $"◄── {response.StatusCode} {formattedString}";
-                        Logger.LogMessage("ReplayTransactions", responseLogMessage);
-
-                        // Pretty-print the original response
-                        try
-                        {
-                            formattedString = JsonSerializer.Serialize(transaction.Response, new JsonSerializerOptions()
+                            catch (Exception ex)
                             {
-                                WriteIndented = Settings.PlaybackExpandJson,
-                                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                            });
+                                formattedString = $"Pretty-print failure - could not display original response: {ex.Message}.";
+                            }
+
+                            // If the response status is 200 OK, assess the device response's "Value", "ErrorNumber", and "ErrorMessage" properties against those in the original response.
+                            if (response.StatusCode == System.Net.HttpStatusCode.OK && transaction.Response != null)
+                            {
+                                try
+                                {
+                                    // Define a list of JSON element names to check for equivalence between the recorded response and the current response
+                                    using JsonDocument currentDoc = JsonDocument.Parse(responseString);
+
+                                    List<Mismatch> elementMismatches = new List<Mismatch>();
+                                    // Check each JSON name in turn
+                                    foreach (string propertyName in RESPONSE_PROPERTIES_TO_COMARE)
+                                    {
+
+                                        // Determine whether the JSON name exists in the original and current responses
+                                        bool originalExists = transaction.Response.RootElement.TryGetProperty(propertyName, out JsonElement originalElem);
+                                        bool currentExists = currentDoc.RootElement.TryGetProperty(propertyName, out JsonElement currentElem);
+
+                                        // Handle different combinations of elements being present and not present
+                                        if (originalExists && currentExists) // Command returns this element in both cases
+                                        {
+                                            if (Regex.Replace(originalElem.GetRawText(), @"\s+", "") == Regex.Replace(currentElem.GetRawText(), @"\s+", "")) // Elements match exactly
+                                            {
+                                                // Report when the Value elements match but don't report when ErrorMessage and ErrorNumber match just to cut down log noise
+                                                if (propertyName.ToUpperInvariant() == "VALUE")
+                                                    Logger.LogMessage("ReplayTransactions", $"    {propertyName} elements match.");
+                                            }
+                                            else // Elements are different
+                                            {
+                                                elementMismatches.Add(new Mismatch(propertyName, VALUES_DIFFERENT_MESSAGE, GetDisplayString(originalElem), GetDisplayString(currentElem)));
+                                                //HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, VALUES_DIFFERENT_MESSAGE, originalElem, currentElem);
+                                            }
+                                        }
+                                        else if (originalExists != currentExists) // One call returned this JSON element while the other did not...
+                                        {
+                                            elementMismatches.Add(new Mismatch(propertyName, ELEMENT_MISSING_IN_ONE_RESPONSE, GetDisplayString(originalElem), GetDisplayString(currentElem)));
+                                            //HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, ELEMENT_MISSING_IN_ONE_RESPONSE, originalElem, currentElem);
+
+                                        }
+                                        else // Neither response contained the required element
+                                        {
+                                            // Handle Value as a special case because it can legitimately be absent in a method response
+                                            if (propertyName.ToUpperInvariant() == "VALUE")
+                                            {
+                                                Logger.LogMessage("ReplayTransactions", "    Method - no Value element.");
+                                            }
+                                            else // Other elements are expected always to be present
+                                            {
+                                                elementMismatches.Add(new Mismatch(propertyName, ELEMENT_MISSING_IN_BOTH_RESPONSES, GetDisplayString(originalElem), GetDisplayString(currentElem)));
+                                                //HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, ELEMENT_MISSING_IN_BOTH_RESPONSES, originalElem, currentElem);
+                                            }
+                                        }
+                                    }
+
+                                    if (elementMismatches.Count > 0)
+                                    {
+                                        // Log the mismatch messages
+                                        foreach (var mismatch in elementMismatches)
+                                        {
+                                            Logger.LogMessage("ReplayTransactions", $"    {mismatch.PropertyName.ToUpperInvariant()} {mismatch.MismatchMessage}");
+                                            Logger.LogMessage("ReplayTransactions", $"      Original: {mismatch.OriginalValue}");
+                                            Logger.LogMessage("ReplayTransactions", $"      Current:  {mismatch.CurrentValue}");
+                                        }
+
+                                        // Add the mismatch record to the list for later display
+                                        Mismatches.Add(new MismatchSummary(responseTime, sendLogMessage, responseLogMessage, elementMismatches));
+                                    }
+
+                                    Logger.Newlines(1);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.LogError("ReplayTransactions", $"Error assessing response to transaction {transaction.RequestUri}: {ex.Message}\r\n{ex}");
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {
-                            formattedString = $"Pretty-print failure - could not display original response: {ex.Message}.";
+                            Logger.LogError("ReplayTransactions", $"Error sending request for {transaction.RequestUri}: {ex.Message}\r\n{ex}");
+                            await DialogService.Alert($"Error while sending request or processing response, see Home page for details: {ex.Message}", "Unable to Replay", null);
                         }
+                    });
 
-                        // If the response status is 200 OK, assess the device response's "Value", "ErrorNumber", and "ErrorMessage" properties against those in the original response.
-                        if (response.StatusCode == System.Net.HttpStatusCode.OK && transaction.Response != null)
-                        {
-                            try
-                            {
-                                // Define a list of JSON element names to check for equivalence between the recorded response and the current response
-                                using JsonDocument currentDoc = JsonDocument.Parse(responseString);
-
-                                List<Mismatch> elementMismatches = new List<Mismatch>();
-                                // Check each JSON name in turn
-                                foreach (string propertyName in RESPONSE_PROPERTIES_TO_COMARE)
-                                {
-
-                                    // Determine whether the JSON name exists in the original and current responses
-                                    bool originalExists = transaction.Response.RootElement.TryGetProperty(propertyName, out JsonElement originalElem);
-                                    bool currentExists = currentDoc.RootElement.TryGetProperty(propertyName, out JsonElement currentElem);
-
-                                    // Handle different combinations of elements being present and not present
-                                    if (originalExists && currentExists) // Command returns this element in both cases
-                                    {
-                                        if (Regex.Replace(originalElem.GetRawText(), @"\s+", "") == Regex.Replace(currentElem.GetRawText(), @"\s+", "")) // Elements match exactly
-                                        {
-                                            // Report when the Value elements match but don't report when ErrorMessage and ErrorNumber match just to cut down log noise
-                                            if (propertyName.ToUpperInvariant() == "VALUE")
-                                                Logger.LogMessage("ReplayTransactions", $"    {propertyName} elements match.");
-                                        }
-                                        else // Elements are different
-                                        {
-                                            elementMismatches.Add(new Mismatch(propertyName, VALUES_DIFFERENT_MESSAGE, GetDisplayString(originalElem), GetDisplayString(currentElem)));
-                                            //HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, VALUES_DIFFERENT_MESSAGE, originalElem, currentElem);
-                                        }
-                                    }
-                                    else if (originalExists != currentExists) // One call returned this JSON element while the other did not...
-                                    {
-                                        elementMismatches.Add(new Mismatch(propertyName, ELEMENT_MISSING_IN_ONE_RESPONSE, GetDisplayString(originalElem), GetDisplayString(currentElem)));
-                                        //HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, ELEMENT_MISSING_IN_ONE_RESPONSE, originalElem, currentElem);
-
-                                    }
-                                    else // Neither response contained the required element
-                                    {
-                                        // Handle Value as a special case because it can legitimately be absent in a method response
-                                        if (propertyName.ToUpperInvariant() == "VALUE")
-                                        {
-                                            Logger.LogMessage("ReplayTransactions", "    Method - no Value element.");
-                                        }
-                                        else // Other elements are expected always to be present
-                                        {
-                                            elementMismatches.Add(new Mismatch(propertyName, ELEMENT_MISSING_IN_BOTH_RESPONSES, GetDisplayString(originalElem), GetDisplayString(currentElem)));
-                                            //HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, ELEMENT_MISSING_IN_BOTH_RESPONSES, originalElem, currentElem);
-                                        }
-                                    }
-                                }
-
-                                if (elementMismatches.Count > 0)
-                                {
-                                    // Log the mismatch messages
-                                    foreach (var mismatch in elementMismatches)
-                                    {
-                                        Logger.LogMessage("ReplayTransactions", $"    {mismatch.PropertyName.ToUpperInvariant()} {mismatch.MismatchMessage}");
-                                        Logger.LogMessage("ReplayTransactions", $"      Original: {mismatch.OriginalValue}");
-                                        Logger.LogMessage("ReplayTransactions", $"      Current:  {mismatch.CurrentValue}");
-                                    }
-
-                                    // Add the mismatch record to the list for later display
-                                    Mismatches.Add(new MismatchSummary(responseTime, sendLogMessage, responseLogMessage, elementMismatches));
-                                }
-
-                                Logger.Newlines(1);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.LogError("ReplayTransactions", $"Error assessing response to transaction {transaction.RequestUri}: {ex.Message}\r\n{ex}");
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError("ReplayTransactions", $"Error sending request for {transaction.RequestUri}: {ex.Message}\r\n{ex}");
-                        await DialogService.Alert($"Error while sending request or processing response, see Home page for details: {ex.Message}", "Unable to Replay", null);
-                    }
-                });
-
-                transactionNumber++;
+                    transactionNumber++;
+                }
+                else // Regex match failed
+                {
+                    Logger.LogError($"Regex failed to extract parameters from request URI: {transaction.RequestUri}");
+                }
 
                 // End of processing this transaction - Exit if cancellation is requested
-                if (State.CancellationToken.IsCancellationRequested)
+                if (replayCancellationToken.IsCancellationRequested)
                 {
                     Logger.LogError("ReplayTransactions", $"Replay cancelled.");
                     break;
@@ -754,10 +770,18 @@
                 Logger.LogMessage("ReplayTransactions", "There were no mismatches");
             }
         }
+        catch (OperationCanceledException) when (replayCancellationToken.IsCancellationRequested)
+        {
+            Logger.LogMessage("ReplayTransactions", "Replay cancelled.");
+        }
         catch (Exception ex)
         {
             Logger.LogError("ReplayTransactions", $"Error replaying file '{selectedFile}': {ex.Message}\r\n{ex}");
             await DialogService.Alert($"Error while replaying, see Home page for details: {ex.Message}", "Unable to Replay", null);
+        }
+        finally
+        {
+            State.CompleteReplay();
         }
     }
 

@@ -338,7 +338,7 @@ namespace AlpacaSpy
                     }
 
                     state.ProxyDevices.Add(proxy);
-                    logger.LogMessage("LoadDevices", $"Registered {proxyName} as proxy device {config.ProxyDeviceNumber}");
+                    logger.LogMessage("LoadDevices", $"Registered {proxyName} as proxy {config.DeviceType} device {config.ProxyDeviceNumber}");
 
                     // Create a per-device TraceLogger for file-based traffic logging
                     string safeName = Regex.Replace(config.Name, @"[^\w]", "_");

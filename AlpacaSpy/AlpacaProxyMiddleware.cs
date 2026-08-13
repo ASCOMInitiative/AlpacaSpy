@@ -133,7 +133,7 @@ namespace AlpacaSpy
                     if (device.RecordTransactions)
                         RecordTransaction(device, context, requestBodyBytes, requestSentToDevice, responseFromDevice, responseMessage, null, method);
 
-                    // COpy the device response to the client response stream without buffering the entire payload in memory.
+                    // Copy the device response to the client response stream without buffering the entire payload in memory.
                     CopyResponseMetadata(context, responseMessage); // Copy the device response metadata (status code, headers) to the client
                     await StreamImageResponseAsync(context, responseMessage, device, logThisCall); // Stream the device response body to the client without buffering the entire payload in memory
                     return;

@@ -10,6 +10,8 @@ namespace AlpacaSpy
     {
         // Server's transaction id that is returned by GetServerTransactionId() and incremented for each new transaction.
         private static uint serverTransactionId = 0;
+        private readonly Lock replayLock = new();
+        private CancellationTokenSource? replayCancellationSource;
 
         #region Initialiser
 
@@ -30,8 +32,6 @@ namespace AlpacaSpy
         #endregion
 
         #region Public properties
-
-        public CancellationToken CancellationToken { get; set; } = CancellationToken.None;
 
         public string InstanceId { get; set; }
 
@@ -87,8 +87,56 @@ namespace AlpacaSpy
             return Interlocked.Increment(ref serverTransactionId);
         }
 
+        public bool TryStartReplay(out CancellationToken cancellationToken)
+        {
+            lock (replayLock)
+            {
+                if (replayCancellationSource is not null)
+                {
+                    cancellationToken = CancellationToken.None;
+                    return false;
+                }
+
+                replayCancellationSource = new CancellationTokenSource();
+                cancellationToken = replayCancellationSource.Token;
+                return true;
+            }
+        }
+
+        public void CancelReplay()
+        {
+            lock (replayLock)
+            {
+                replayCancellationSource?.Cancel();
+            }
+        }
+
+        public bool IsReplayRunning()
+        {
+            lock (replayLock)
+            {
+                if (replayCancellationSource is not null && !replayCancellationSource.IsCancellationRequested)
+                    return true;
+                else
+                    return false;
+            }
+        }
+
+        public void CompleteReplay()
+        {
+            CancellationTokenSource? cancellationSource;
+            lock (replayLock)
+            {
+                cancellationSource = replayCancellationSource;
+                replayCancellationSource = null;
+            }
+
+            cancellationSource?.Dispose();
+        }
+
         public void ResetState()
         {
+            CancelReplay();
             Connected = false;
             DisplayRestartMessage = false;
             StatusText = string.Empty;

@@ -24,6 +24,7 @@
                 <RadzenButton Click="CancelButtonPressed"
                               Text="Cancel"
                               ButtonStyle="ButtonStyle.Danger"
+                              Disabled="!state.IsReplayRunning()"
                               Style="border-radius:20px; padding-top:2px; height:24px; min-height:24px;" />
             </span>
         }
@@ -39,6 +40,7 @@
                 <RadzenButton Click="CancelButtonPressed"
                               Text="Cancel Playback"
                               ButtonStyle="ButtonStyle.Danger"
+                              Disabled="!state.IsReplayRunning()"
                               Style="border-radius:20px;" />
             </span>
         }
@@ -63,8 +65,6 @@
 
 @code
 {
-    CancellationTokenSource cancelAlpacaSpy = new CancellationTokenSource();
-
     private bool isSmall;
     private bool _disposed;
     private bool _logContentChanged;
@@ -84,9 +84,6 @@
         Ui.OnChange += OnBrowserResize;
         state.StateChanged += OnStateChanged;
         settings.ConfigurationChanged += OnStateChanged;
-
-        // Set the application cancel token
-        state.CancellationToken = cancelAlpacaSpy.Token;
 
         // Get any current log content and place it in the cache
         lock (Globals.writeLogLock)
@@ -158,9 +155,10 @@
 
     #region Button handlers
 
-    private async Task CancelButtonPressed()
+    private Task CancelButtonPressed()
     {
-        cancelAlpacaSpy.Cancel();
+        state.CancelReplay();
+        return Task.CompletedTask;
     }
 
     private async Task ClearScreen()
