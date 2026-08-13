@@ -36,7 +36,7 @@
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
                         <span style="margin-bottom:24px;min-width:205px;">
                             <RadzenCheckBox Value="device.RecordTransactions"
-                                            ValueChanged="@((bool v) => { device.RecordTransactions = v;})"
+                                            ValueChanged="@((bool v) => { device.RecordTransactions = v;settings.Save();})"
                                             Name="@($"rec_{device.UniqueId}")" />
                             <label>Record commands from clients and device responses</label>
                         </span>
