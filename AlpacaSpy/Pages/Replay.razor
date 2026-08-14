@@ -137,7 +137,7 @@
 <div class="target-device-list">
     @if (State.ConfiguredDevices != null && State.ConfiguredDevices.Any())
     {
-        @foreach (var device in State.ConfiguredDevices)
+        @foreach (ConfiguredDevice device in State.ConfiguredDevices)
         {
             <div>
                 <input style="margin-left:18px;" type="radio" name="targetDevice" id="@device.UniqueId" checked="@(State.ReplayTargetDevice?.UniqueId == device.UniqueId)" @onchange="() => SelectTargetDevice(device)" />
@@ -206,14 +206,14 @@
             {
                 @foreach (DriveInfo? drive in DriveInfo.GetDrives().OrderBy(d => d.Name))
                 {
-                    var drivePath = drive.Name;
+                    string drivePath = drive.Name;
                     <div class="tree-node">
                         <button class="expander" @onclick="() => ToggleExpand(drivePath)">@(IsExpanded(drivePath) ? "▼" : "▶")</button>
                         <span class="node-label" @onclick="() => SelectPath(drivePath)">@drivePath</span>
                         @if (IsExpanded(drivePath))
                         {
                             <div class="children" style="margin-left:16px">
-                                @foreach (var dir in GetDirectoriesCached(drivePath))
+                                @foreach (string dir in GetDirectoriesCached(drivePath))
                                 {
                                     @RenderDirectory(dir)
                                 }
@@ -226,8 +226,8 @@
             {
                 // Show the currently selected path as the root of the visible tree when possible,
                 // falling back to the configured baseRootPath (Documents or ASCOM Logs).
-                var root = SelectedPath ?? baseRootPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                var displayName = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar));
+                string root = SelectedPath ?? baseRootPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string? displayName = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar));
                 if (string.IsNullOrEmpty(displayName)) displayName = root;
                 <div class="tree-node">
                     <button class="expander" @onclick="() => ToggleExpand(root)">@(IsExpanded(root) ? "▼" : "▶")</button>
@@ -235,7 +235,7 @@
                     @if (IsExpanded(root))
                     {
                         <div class="children" style="margin-left:16px">
-                            @foreach (var dir in GetDirectoriesCached(root))
+                            @foreach (string dir in GetDirectoriesCached(root))
                             {
                                 @RenderDirectory(dir)
                             }
@@ -252,7 +252,7 @@
             @if (State.ReplayJsonFiles != null && State.ReplayJsonFiles.Any())
             {
                 <div class="file-checklist">
-                    @foreach (var file in State.ReplayJsonFiles)
+                    @foreach (System.IO.FileInfo file in State.ReplayJsonFiles)
                     {
                         <div class="file-item">
                             <input type="radio" name="jsonFiles" checked="@(State.ReplaySelectedFileFullName == file.FullName)" @onchange="@(e => OnFileRadioChanged(file.FullName, e))" />
@@ -351,15 +351,15 @@
         // Play back recording
         try
         {
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var transactions = new List<AlpacaTransaction>();
-            var totalTransactions = 0;
+            JsonSerializerOptions options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            List<AlpacaTransaction> transactions = new List<AlpacaTransaction>();
+            int totalTransactions = 0;
             string deviceTypeString = "Unknown";
 
             // Determine the device type of the recorded file by opening it as a JSON document and extracting the device type from first URL entry
             Logger.LogMessage("ReplayTransactions", $"Parsing JSON file {selectedFile}");
             using (FileStream? countStream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read)) // Open the file as a file stream
-            using (var jsonDocument = await JsonDocument.ParseAsync(countStream)) // Read the file as a JSON document
+            using (JsonDocument jsonDocument = await JsonDocument.ParseAsync(countStream)) // Read the file as a JSON document
             {
                 // Check that the document does contain a JSON array
                 if (jsonDocument.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array) // No array found
@@ -379,7 +379,7 @@
                     // Get the first element in the array
                     JsonElement firstElement = jsonDocument.RootElement[0];
                     // Check whether we can read the value of RequestUri in the first array element
-                    if (firstElement.ValueKind == JsonValueKind.Object && firstElement.TryGetProperty("RequestUri", out var requestUriProp) && requestUriProp.ValueKind == JsonValueKind.String) // Found OK
+                    if (firstElement.ValueKind == JsonValueKind.Object && firstElement.TryGetProperty("RequestUri", out JsonElement requestUriProp) && requestUriProp.ValueKind == JsonValueKind.String) // Found OK
                     {
                         // Get the request URI
                         firstRequestUri = requestUriProp.GetString();
@@ -432,7 +432,7 @@
             // Now read in the file as an array of AlpacaTransactions
             using (FileStream? readFilestream = new FileStream(selectedFile, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
-                var processed = 0;
+                int processed = 0;
                 await foreach (AlpacaTransaction? alpacaTransaction in JsonSerializer.DeserializeAsyncEnumerable<AlpacaTransaction>(readFilestream, options))
                 {
                     // Ignore any failed AlpacaTransaction de-serialisations
@@ -550,8 +550,8 @@
                         // Try to add each request header to request.Headers .
                         foreach (KeyValuePair<string, string[]> kvp in transaction.RequestHeaders)
                         {
-                            var headerName = kvp.Key;
-                            var headerValues = kvp.Value ?? Array.Empty<string>();
+                            string headerName = kvp.Key;
+                            string[] headerValues = kvp.Value ?? Array.Empty<string>();
 
                             // Try general headers first
                             if (request.Headers.TryAddWithoutValidation(headerName, headerValues)) // Added header OK
@@ -681,7 +681,7 @@
                                     if (elementMismatches.Count > 0)
                                     {
                                         // Log the mismatch messages
-                                        foreach (var mismatch in elementMismatches)
+                                        foreach (Mismatch mismatch in elementMismatches)
                                         {
                                             Logger.LogMessage("ReplayTransactions", $"    {mismatch.PropertyName.ToUpperInvariant()} {mismatch.MismatchMessage}.");
                                             Logger.LogMessage("ReplayTransactions", $"      Original: {mismatch.OriginalValue}");
@@ -732,16 +732,16 @@
                 Logger.LogMessage("", $"Overall {mismatchCount} out of {transactions.Count} transactions had {(mismatchCount == 1 ? "a different outcome" : "different outcomes")} resulting in:");
 
                 // Count the total number of Mismatch objects across all summaries that have each possible message
-                foreach (string message in ReplayMismatchMessages)
+                foreach (string possibleMismatchMessage in ReplayMismatchMessages)
                 {
                     // Count the total number of Mismatch objects across all summaries that have this message
                     int messageCount = 0;
                     foreach (MismatchSummary summary in Mismatches) // Iterate over MismatchSummary records
                     {
                         if (summary.Mismatches == null) continue;
-                        foreach (Mismatch mm in summary.Mismatches) // Iterate over the Mismatch records in each MismatchSummary record
+                        foreach (Mismatch mismatchMessage in summary.Mismatches) // Iterate over the Mismatch records in each MismatchSummary record
                         {
-                            if (string.Equals(mm.MismatchMessage, message, StringComparison.Ordinal)) // This Mismatch does contain the mismatch type being counted
+                            if (mismatchMessage.MismatchMessage.Contains(possibleMismatchMessage, StringComparison.InvariantCultureIgnoreCase)) // This Mismatch does contain the mismatch type being counted
                             {
                                 // Increment the count
                                 messageCount++;
@@ -750,7 +750,7 @@
                     }
 
                     // Log the outcome
-                    Logger.LogMessage("ReplayTransactions", $"    {messageCount} \"{message}\" mismatch{(messageCount == 1 ? "" : "es")}.");
+                    Logger.LogMessage("ReplayTransactions", $"    {messageCount} \"{possibleMismatchMessage}\" mismatch{(messageCount == 1 ? "" : "es")}.");
                 }
                 Logger.Newlines(2);
 
@@ -800,7 +800,7 @@
         if (string.IsNullOrEmpty(path)) return string.Empty;
         try
         {
-            var fp = Path.GetFullPath(path);
+            string fp = Path.GetFullPath(path);
             return fp.TrimEnd(Path.DirectorySeparatorChar);
         }
         catch
@@ -815,8 +815,8 @@
     /// </summary>
     IEnumerable<string> GetDirectoriesCached(string path)
     {
-        var key = NormalizePath(path);
-        if (!dirCache.TryGetValue(key, out var list))
+        string key = NormalizePath(path);
+        if (!dirCache.TryGetValue(key, out List<string>? list))
         {
             List<string> raw = Browser.GetDirectories(path)?.ToList() ?? new List<string>();
             // normalize child paths for consistency
@@ -832,7 +832,7 @@
     /// </summary>
     void ToggleExpand(string path)
     {
-        var key = NormalizePath(path);
+        string key = NormalizePath(path);
         if (expanded.Contains(key))
             expanded.Remove(key);
         else
@@ -856,7 +856,7 @@
     /// </summary>
     void ShowDocuments()
     {
-        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         if (!string.IsNullOrEmpty(docs) && Directory.Exists(docs))
         {
             baseIsDisks = false;
@@ -906,7 +906,7 @@
     {
         try
         {
-            var dir = TraceLogger.GetDefaultLogFilePath(DateTime.Now);
+            string dir = TraceLogger.GetDefaultLogFilePath(DateTime.Now);
             // If TraceLogger returns a file path rather than a directory, get its directory
             if (!string.IsNullOrEmpty(dir) && File.Exists(dir))
             {
@@ -924,7 +924,7 @@
             // Select the first child under ASCOM logs, or the directory itself if no children
             if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
             {
-                var children = GetDirectoriesCached(dir).ToList();
+                List<string> children = GetDirectoriesCached(dir).ToList();
                 if (children.Any())
                 {
                     SelectPath(children.First());
@@ -944,7 +944,7 @@
             expanded.Clear();
             State.ReplaySelectedFileFullName = null;
 
-            var firstDrive = DriveInfo.GetDrives().FirstOrDefault();
+            DriveInfo? firstDrive = DriveInfo.GetDrives().FirstOrDefault();
             if (firstDrive != null && Directory.Exists(firstDrive.Name))
             {
                 SelectPath(firstDrive.Name);
@@ -1091,11 +1091,11 @@
     RenderFragment RenderDirectory(string path) => builder =>
     {
         // simple recursive renderer: shows one level and an expander if children exist
-        var seq = 0;
+        int seq = 0;
         builder.OpenElement(seq++, "div");
         builder.AddAttribute(seq++, "class", "tree-node");
 
-        var hasChildren = GetDirectoriesCached(path).Any();
+        bool hasChildren = GetDirectoriesCached(path).Any();
         if (hasChildren)
         {
             builder.OpenElement(seq++, "button");
@@ -1123,7 +1123,7 @@
             builder.OpenElement(seq++, "div");
             builder.AddAttribute(seq++, "class", "children");
             builder.AddAttribute(seq++, "style", "margin-left:16px");
-            foreach (var child in GetDirectoriesCached(path))
+            foreach (string child in GetDirectoriesCached(path))
             {
                 builder.AddContent(seq++, RenderDirectory(child));
             }
@@ -1158,16 +1158,16 @@
         ExpandAncestors(path);
 
         // make sure the selected node itself is expanded so its children are visible
-        var normPath = NormalizePath(path);
+        string normPath = NormalizePath(path);
         expanded.Add(normPath);
 
         // Force refresh of parent's child list so UI re-renders with updated entries
         try
         {
-            var parent = Directory.GetParent(path);
+            DirectoryInfo? parent = Directory.GetParent(path);
             if (parent != null)
             {
-                var parentKey = NormalizePath(parent.FullName);
+                string parentKey = NormalizePath(parent.FullName);
                 // remove cached children for parent to force re-fetch
                 dirCache.Remove(parentKey);
                 // prefetch updated children
@@ -1193,7 +1193,7 @@
         if (string.IsNullOrEmpty(SelectedPath))
             return;
 
-        var parent = Directory.GetParent(SelectedPath);
+        DirectoryInfo? parent = Directory.GetParent(SelectedPath);
         if (parent != null)
         {
             NavigateTo(parent.FullName);
@@ -1209,10 +1209,10 @@
         try
         {
             // walk up from the path to root (or to baseRootPath when baseIsDisks == false)
-            var p = Directory.GetParent(path);
+            DirectoryInfo? p = Directory.GetParent(path);
             while (p != null)
             {
-                var key = NormalizePath(p.FullName);
+                string key = NormalizePath(p.FullName);
 
                 // stop if we've reached the baseRootPath when in Documents/ASCOM mode
                 if (!baseIsDisks && !string.IsNullOrEmpty(baseRootPath))

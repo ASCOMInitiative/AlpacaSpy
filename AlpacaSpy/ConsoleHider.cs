@@ -20,14 +20,14 @@ public static class ConsoleHider
     private const int SW_SHOWNORMAL = 1;
     public static void MinimizeConsoleWindow()
     {
-        var handle = GetConsoleWindow();
+        IntPtr handle = GetConsoleWindow();
         if (handle != IntPtr.Zero)
             ShowWindow(handle, SW_MINIMIZE);
     }
 
     public static void HideConsoleWindow()
     {
-        var handle = GetConsoleWindow();
+        IntPtr handle = GetConsoleWindow();
         if (handle != IntPtr.Zero)
             ShowWindow(handle, SW_HIDE);
     }
@@ -44,7 +44,7 @@ public static class ConsoleHider
 
     public static void ShowConsoleWindow()
     {
-        var handle = GetConsoleWindow();
+        IntPtr handle = GetConsoleWindow();
         if (handle != IntPtr.Zero)
             ShowWindow(handle, SW_SHOWNORMAL);
     }

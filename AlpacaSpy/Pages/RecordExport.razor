@@ -129,7 +129,7 @@
                 };
 
                 // Create a JSON writer around the file stream
-                using var writer = new Utf8JsonWriter(output, options);
+                using Utf8JsonWriter writer = new Utf8JsonWriter(output, options);
 
                 // Write the opening of the JSON array
                 writer.WriteStartArray();
@@ -141,7 +141,7 @@
                 int i = 0;
 
                 // Loop over each transaction, writing it to disk
-                foreach (var transaction in state.Transactions[device])
+                foreach (AlpacaTransaction transaction in state.Transactions[device])
                 {
                     // Serialise the transaction
                     JsonSerializer.Serialize(writer, transaction);

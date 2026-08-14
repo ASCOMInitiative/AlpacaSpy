@@ -26,14 +26,14 @@ namespace AlpacaSpy
             if (!IsEnabled(logLevel))
                 return;
 
-            var message = formatter(state, exception);
-            var levelString = GetLevelString(logLevel);
+            string message = formatter(state, exception);
+            string levelString = GetLevelString(logLevel);
 
             lock (Globals.writeLogLock)
             {
                 // Write the message to the console and color appropriately
                 Console.Write($"{DateTime.Now:HH:mm:ss.fff} ");
-                var originalColour = Console.ForegroundColor;
+                ConsoleColor originalColour = Console.ForegroundColor;
 
                 // Select an appropriate colour for the log level
                 switch (logLevel)
