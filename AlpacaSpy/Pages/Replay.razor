@@ -1,9 +1,10 @@
 ﻿@page "/filebrowser"
-@using ASCOM.Tools
-@using ASCOM.Common
+@using System.Diagnostics
+@using System.Linq
 @using System.Text.Json
 @using System.Text.RegularExpressions
-@using System.Linq
+@using ASCOM.Common
+@using ASCOM.Tools
 
 @inject FileBrowserService Browser
 @inject NavigationManager Navigation
@@ -287,7 +288,7 @@
     static readonly string[] ReplayMismatchMessages = { VALUES_DIFFERENT_MESSAGE, ELEMENT_MISSING_IN_ONE_RESPONSE, ELEMENT_MISSING_IN_BOTH_RESPONSES };
 
     // Create a regex to extract the device type, device number and method from the request URI.
-    static readonly Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/(?<DeviceNumber>[\d+])\/(?<Method>[^\/\?]+)\?*(?<Parameters>.*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    static readonly Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceType>[^\/]+)\/(?<DeviceNumber>[\d+])\/(?<Method>[^\/\?]+)\?*(?<Parameters>.*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // Define the list of properties to compare between the original recording and the current device response
     static readonly string[] RESPONSE_PROPERTIES_TO_COMARE = { "Value", "ClientTransactionID", "ErrorNumber", "ErrorMessage" };
@@ -353,6 +354,7 @@
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var transactions = new List<AlpacaTransaction>();
             var totalTransactions = 0;
+            string deviceTypeString = "Unknown";
 
             // Determine the device type of the recorded file by opening it as a JSON document and extracting the device type from first URL entry
             Logger.LogMessage("ReplayTransactions", $"Parsing JSON file {selectedFile}");
@@ -384,14 +386,13 @@
                         Logger.LogDebug("ReplayTransactions", $"First RequestUri: {firstRequestUri}");
 
                         //Extract the device type from the URI using a regex
-                        Regex r = new Regex(@"\/api\/v1\/(?<DeviceTypeString>.*?)\/.*?", RegexOptions.IgnoreCase);
-                        var match = r.Match(firstRequestUri ?? string.Empty);
+                        Match match = uriRegex.Match(firstRequestUri ?? string.Empty);
 
                         // Check whether we got a value
                         if (match.Success) // Got a match OK
                         {
                             // Extract the device type as a string
-                            string deviceTypeString = match.Groups["DeviceTypeString"].Value;
+                            deviceTypeString = match.Groups["DeviceType"].Value;
 
                             // Convert the string device type to a DeviceTypes enum value
                             AlpacaDeviceType deviceType = Enum.Parse<AlpacaDeviceType>(deviceTypeString, true);
@@ -479,8 +480,13 @@
 
             Logger.Newlines(1);
 
+            // Initialise this transaction's number (used in calculating additional delays)
+            int transactionNumber = 0;
+
+            // Create a stopwatch to time device responses
+            Stopwatch transactionTimer = new();
+
             // Send each recorded item to the selected device in turn and log the outcome
-            int transactionNumber = 0; // Number of this transaction (used in calculating additional delays)
             foreach (AlpacaTransaction transaction in transactions)
             {
                 // Get the method being called
@@ -489,20 +495,18 @@
                 // Check whether we got a value
                 string methodName = "UnknownMethod";
                 int deviceNumber = 0;
-                string deviceType = "UnknownDeviceType";
                 string parameters = string.Empty;
 
+                // Check whether a valid regex match was found
                 if (match.Success) // Got a match OK
                 {
-                    // static readonly Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceTypeString>[^\/]+)\/(?<DeviceNumber>[\d+])\/(?<Method>[^\/\?]+)\?(?<Parameters>.*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                    // Extract the device type, number and parameters from the URI
-                    deviceType = match.Groups["DeviceTypeString"].Value;
+                    // Extract the device type, number, method name and parameters from the URI
                     deviceNumber = int.Parse(match.Groups["DeviceNumber"].Value);
                     methodName = match.Groups["Method"].Value;
                     parameters = match.Groups["Parameters"].Value;
-                    // Create the target URI based on the targe device's IP address, port and Alpaca device number
-                    //string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}{transaction.RequestUri}";
-                    string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}/api/v1/{deviceType}/{State.ReplayTargetDevice?.RemoteDeviceNumber}/{methodName}?{parameters}";
+
+                    // Create the replay target URI based on the target device's IP address, port and Alpaca device number, method name and query parameters (if any).
+                    string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}/api/v1/{deviceTypeString}/{State.ReplayTargetDevice?.RemoteDeviceNumber}/{methodName}?{parameters}";
 
                     // Create the outgoing log message and save it for use if the device responds differently to the recorded outcome
                     sendLogMessage = $"──► {transaction.RequestMethod} {CapitaliseMemberName(methodName)} - {targetUri}";
@@ -568,13 +572,19 @@
                     if (delayMs >= 1)
                         await Task.Delay(delayMs, replayCancellationToken);
 
+                    // Set the transaction timer to 0
+                    transactionTimer.Restart();
+
                     // Send the request to the target device and wait for a response
                     await client.SendAsync(request, replayCancellationToken).ContinueWith(async responseTask =>
                     {
                         try
                         {
-                            var response = await responseTask;
+                            HttpResponseMessage? response = await responseTask;
                             string responseString = await response.Content.ReadAsStringAsync();
+
+                            // Stop the transaction timer
+                            transactionTimer.Stop();
 
                             // Handle long ImageArray responses by replacing the response string with a placeholder message
                             if (methodName.Contains("ImageArray", StringComparison.OrdinalIgnoreCase) & responseString.Length > 1000)
@@ -643,31 +653,27 @@
                                             {
                                                 // Report when the Value elements match but don't report when ErrorMessage and ErrorNumber match just to cut down log noise
                                                 if (propertyName.ToUpperInvariant() == "VALUE")
-                                                    Logger.LogMessage("ReplayTransactions", $"    {propertyName} elements match.");
+                                                    Logger.LogMessage("ReplayTransactions", $"    {propertyName} elements match. ({transactionTimer.ElapsedMilliseconds}ms)");
                                             }
                                             else // Elements are different
                                             {
-                                                elementMismatches.Add(new Mismatch(propertyName, VALUES_DIFFERENT_MESSAGE, GetDisplayString(originalElem), GetDisplayString(currentElem)));
-                                                //HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, VALUES_DIFFERENT_MESSAGE, originalElem, currentElem);
+                                                elementMismatches.Add(new Mismatch(propertyName, $"{VALUES_DIFFERENT_MESSAGE} ({transactionTimer.ElapsedMilliseconds}ms)", GetDisplayString(originalElem), GetDisplayString(currentElem)));
                                             }
                                         }
                                         else if (originalExists != currentExists) // One call returned this JSON element while the other did not...
                                         {
-                                            elementMismatches.Add(new Mismatch(propertyName, ELEMENT_MISSING_IN_ONE_RESPONSE, GetDisplayString(originalElem), GetDisplayString(currentElem)));
-                                            //HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, ELEMENT_MISSING_IN_ONE_RESPONSE, originalElem, currentElem);
-
+                                            elementMismatches.Add(new Mismatch(propertyName, $"{ELEMENT_MISSING_IN_ONE_RESPONSE} ({transactionTimer.ElapsedMilliseconds}ms)", GetDisplayString(originalElem), GetDisplayString(currentElem)));
                                         }
                                         else // Neither response contained the required element
                                         {
                                             // Handle Value as a special case because it can legitimately be absent in a method response
                                             if (propertyName.ToUpperInvariant() == "VALUE")
                                             {
-                                                Logger.LogMessage("ReplayTransactions", "    Method - no Value element.");
+                                                Logger.LogMessage("ReplayTransactions", $"    Method - No Value element. ({transactionTimer.ElapsedMilliseconds}ms)");
                                             }
                                             else // Other elements are expected always to be present
                                             {
-                                                elementMismatches.Add(new Mismatch(propertyName, ELEMENT_MISSING_IN_BOTH_RESPONSES, GetDisplayString(originalElem), GetDisplayString(currentElem)));
-                                                //HandleMismatch(responseTime, propertyName, sendLogMessage, responseLogMessage, ELEMENT_MISSING_IN_BOTH_RESPONSES, originalElem, currentElem);
+                                                elementMismatches.Add(new Mismatch(propertyName, $"{ELEMENT_MISSING_IN_BOTH_RESPONSES} ({transactionTimer.ElapsedMilliseconds}ms)", GetDisplayString(originalElem), GetDisplayString(currentElem)));
                                             }
                                         }
                                     }
@@ -677,7 +683,7 @@
                                         // Log the mismatch messages
                                         foreach (var mismatch in elementMismatches)
                                         {
-                                            Logger.LogMessage("ReplayTransactions", $"    {mismatch.PropertyName.ToUpperInvariant()} {mismatch.MismatchMessage}");
+                                            Logger.LogMessage("ReplayTransactions", $"    {mismatch.PropertyName.ToUpperInvariant()} {mismatch.MismatchMessage}.");
                                             Logger.LogMessage("ReplayTransactions", $"      Original: {mismatch.OriginalValue}");
                                             Logger.LogMessage("ReplayTransactions", $"      Current:  {mismatch.CurrentValue}");
                                         }
