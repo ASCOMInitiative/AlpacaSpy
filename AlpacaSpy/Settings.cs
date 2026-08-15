@@ -203,9 +203,9 @@ namespace AlpacaSpy
 
         #endregion
 
-        #region Internal properties
+        #region Internal properties (not persisted because they are not public)
 
-        internal string Status { get; private set; } = string.Empty;
+        internal string Status { get; set; } = string.Empty;
 
         #endregion
 

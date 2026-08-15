@@ -178,7 +178,7 @@
                       Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDocuments"
                       Style="margin-left:8px; border-radius:20px; text-transform:none;" />
-        <RadzenButton Text=@(OperatingSystem.IsWindows() ? "Disks" : "Root")
+        <RadzenButton Text=@(OperatingSystem.IsWindows()? "Disks" : "Root")
                       Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDisks"
                       Style="margin-left:8px; border-radius:20px; text-transform:none;" />
@@ -481,7 +481,8 @@
             Logger.Newlines(1);
 
             // Initialise this transaction's number (used in calculating additional delays)
-            int transactionNumber = 0;
+            int transactionNumber = 1;
+            int transactionCount = transactions.Count;
 
             // Create a stopwatch to time device responses
             Stopwatch transactionTimer = new();
@@ -494,16 +495,18 @@
 
                 // Check whether we got a value
                 string methodName = "UnknownMethod";
-                int deviceNumber = 0;
                 string parameters = string.Empty;
 
                 // Check whether a valid regex match was found
                 if (match.Success) // Got a match OK
                 {
+
                     // Extract the device type, number, method name and parameters from the URI
-                    deviceNumber = int.Parse(match.Groups["DeviceNumber"].Value);
                     methodName = match.Groups["Method"].Value;
                     parameters = match.Groups["Parameters"].Value;
+
+                    // Update the status message
+                    SetStatus($"Replaying transaction {transactionNumber} of {transactionCount}: {transaction.RequestMethod} {methodName}");
 
                     // Create the replay target URI based on the target device's IP address, port and Alpaca device number, method name and query parameters (if any).
                     string targetUri = $"http://{State.ReplayTargetDevice?.IpAddress}:{State.ReplayTargetDevice?.PortNumber}/api/v1/{deviceTypeString}/{State.ReplayTargetDevice?.RemoteDeviceNumber}/{methodName}?{parameters}";
@@ -721,6 +724,9 @@
                     break;
                 }
             }
+
+            // Update status
+            SetStatus("Replay complete");
             Logger.Newlines(1);
 
             // All transactions have been processed - report any mis-matches
@@ -1237,5 +1243,10 @@
         {
             // ignore any IO issues while expanding
         }
+    }
+
+    void SetStatus(string message)
+    {
+        Settings.Status = message;
     }
 }
