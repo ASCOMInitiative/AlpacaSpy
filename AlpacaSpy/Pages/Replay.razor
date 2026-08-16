@@ -178,7 +178,7 @@
                       Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDocuments"
                       Style="margin-left:8px; border-radius:20px; text-transform:none;" />
-        <RadzenButton Text=@(OperatingSystem.IsWindows()? "Disks" : "Root")
+        <RadzenButton Text=@(OperatingSystem.IsWindows() ? "Disks" : "Root")
                       Disabled="@(State.ReplayTargetDevice is null )"
                       Click="@ShowDisks"
                       Style="margin-left:8px; border-radius:20px; text-transform:none;" />
@@ -285,10 +285,10 @@
     const string VALUES_DIFFERENT_MESSAGE = "ELEMENTS ARE DIFFERENT";
     const string ELEMENT_MISSING_IN_ONE_RESPONSE = "ELEMENT MISSING IN ONE RESPONSE";
     const string ELEMENT_MISSING_IN_BOTH_RESPONSES = "ELEMENT MISSING IN BOTH RESPONSES";
-    static readonly string[] ReplayMismatchMessages = { VALUES_DIFFERENT_MESSAGE, ELEMENT_MISSING_IN_ONE_RESPONSE, ELEMENT_MISSING_IN_BOTH_RESPONSES };
+    static readonly string[] REPLAY_MISMATCH_MESSAGES = { VALUES_DIFFERENT_MESSAGE, ELEMENT_MISSING_IN_ONE_RESPONSE, ELEMENT_MISSING_IN_BOTH_RESPONSES };
 
     // Create a regex to extract the device type, device number and method from the request URI.
-    static readonly Regex uriRegex = new Regex(@"\/api\/v1\/(?<DeviceType>[^\/]+)\/(?<DeviceNumber>[\d+])\/(?<Method>[^\/\?]+)\?*(?<Parameters>.*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    static readonly Regex URI_REGEX = new Regex(@"\/api\/v1\/(?<DeviceType>[^\/]+)\/(?<DeviceNumber>[\d+])\/(?<Method>[^\/\?]+)\?*(?<Parameters>.*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // Define the list of properties to compare between the original recording and the current device response
     static readonly string[] RESPONSE_PROPERTIES_TO_COMARE = { "Value", "ClientTransactionID", "ErrorNumber", "ErrorMessage" };
@@ -309,6 +309,8 @@
     // Variable to hold the current progress of the replay operation as a percentage
     double replayProgress = 0.0;
 
+    #region Blazor Lifecycle methods
+
     /// <summary>
     /// Initialize the component.
     /// </summary>
@@ -317,6 +319,10 @@
         // Default to ASCOM Logs view if available
         ShowAscomLogs(false);
     }
+
+    #endregion
+
+    #region Replay Transactions
 
     /// <summary>
     /// Entry point for replaying transactions from the selected JSON file.
@@ -386,7 +392,7 @@
                         Logger.LogDebug("ReplayTransactions", $"First RequestUri: {firstRequestUri}");
 
                         //Extract the device type from the URI using a regex
-                        Match match = uriRegex.Match(firstRequestUri ?? string.Empty);
+                        Match match = URI_REGEX.Match(firstRequestUri ?? string.Empty);
 
                         // Check whether we got a value
                         if (match.Success) // Got a match OK
@@ -491,7 +497,7 @@
             foreach (AlpacaTransaction transaction in transactions)
             {
                 // Get the method being called
-                Match match = uriRegex.Match(transaction.RequestUri ?? string.Empty);
+                Match match = URI_REGEX.Match(transaction.RequestUri ?? string.Empty);
 
                 // Check whether we got a value
                 string methodName = "UnknownMethod";
@@ -738,7 +744,7 @@
                 Logger.LogMessage("", $"Overall {mismatchCount} out of {transactions.Count} transactions had {(mismatchCount == 1 ? "a different outcome" : "different outcomes")} resulting in:");
 
                 // Count the total number of Mismatch objects across all summaries that have each possible message
-                foreach (string possibleMismatchMessage in ReplayMismatchMessages)
+                foreach (string possibleMismatchMessage in REPLAY_MISMATCH_MESSAGES)
                 {
                     // Count the total number of Mismatch objects across all summaries that have this message
                     int messageCount = 0;
@@ -796,6 +802,99 @@
             State.CompleteReplay();
         }
     }
+
+    /// <summary>
+    /// Handles a mismatch between the original and current JSON responses.
+    /// </summary>
+    /// <param name="mismatchTime">The time the mismatch was detected.</param>
+    /// <param name="propertyName">The name of the property that mismatched.</param>
+    /// <param name="sendLogMessage">The log message for the sent request.</param>
+    /// <param name="responseLogMessage">The log message for the received response.</param>
+    /// <param name="mismatchDescription">A description of the mismatch.</param>
+    /// <param name="originalJsonResponse">The original JSON response.</param>
+    /// <param name="currentJsonResponse">The current JSON response.</param>
+    void HandleMismatch(DateTime mismatchTime, string sendLogMessage, string responseLogMessage, List<Mismatch> mismatches)
+    {
+    }
+
+    /// <summary>
+    /// Formats a JSON element for display, pretty-printing objects and arrays.
+    /// </summary>
+    /// <param name="element">The JSON element to format.</param>
+    /// <returns>A formatted string representation of the JSON element.</returns>
+    string GetDisplayString(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object || element.ValueKind == JsonValueKind.Array)
+        {
+            return JsonSerializer.Serialize(element, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
+        }
+        return element.GetRawText();
+    }
+
+    /// <summary>
+    /// Formats a JSON element into a string of name-value pairs.
+    /// </summary>
+    /// <param name="element">The JSON element to format.</param>
+    /// <returns>A string representation of the JSON element's name-value pairs.</returns>
+    string FormatJsonNameValuePairs(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            List<string> parts = new();
+
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                parts.Add($"{property.Name}:{FormatJsonNameValuePairs(property.Value)}");
+            }
+
+            return string.Join(", ", parts);
+        }
+
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            List<string> parts = new();
+
+            foreach (JsonElement item in element.EnumerateArray())
+            {
+                parts.Add(FormatJsonNameValuePairs(item));
+            }
+
+            return string.Join(", ", parts);
+        }
+
+        return element.GetRawText();
+    }
+
+    /// <summary>
+    /// Creates a correctly capitalised version of the member's name
+    /// </summary>
+    /// <param name="input">The member name to capitalise.</param>
+    /// <returns>The capitalised member name.</returns>
+    string CapitaliseMemberName(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        // Try to find the member name in the MemberNames enum in order to get its correctly capitalised version
+        try
+        {
+            // Return the correctly cased member name
+            return Enum.Parse<MemberNames>(input, true).ToString();
+        }
+        catch
+        {
+            // If the enum parse fails just capitalise the first letter
+            return char.ToUpper(input[0]) + input.Substring(1);
+        }
+    }
+
+    #endregion
+
+    #region File system navigation code
 
     /// <summary>
     /// Normalize a path to a full path without a trailing directory separator.
@@ -1001,95 +1100,6 @@
     }
 
     /// <summary>
-    /// Handles a mismatch between the original and current JSON responses.
-    /// </summary>
-    /// <param name="mismatchTime">The time the mismatch was detected.</param>
-    /// <param name="propertyName">The name of the property that mismatched.</param>
-    /// <param name="sendLogMessage">The log message for the sent request.</param>
-    /// <param name="responseLogMessage">The log message for the received response.</param>
-    /// <param name="mismatchDescription">A description of the mismatch.</param>
-    /// <param name="originalJsonResponse">The original JSON response.</param>
-    /// <param name="currentJsonResponse">The current JSON response.</param>
-    void HandleMismatch(DateTime mismatchTime, string sendLogMessage, string responseLogMessage, List<Mismatch> mismatches)
-    {
-    }
-
-    /// <summary>
-    /// Formats a JSON element for display, pretty-printing objects and arrays.
-    /// </summary>
-    /// <param name="element">The JSON element to format.</param>
-    /// <returns>A formatted string representation of the JSON element.</returns>
-    string GetDisplayString(JsonElement element)
-    {
-        if (element.ValueKind == JsonValueKind.Object || element.ValueKind == JsonValueKind.Array)
-        {
-            return JsonSerializer.Serialize(element, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-            });
-        }
-        return element.GetRawText();
-    }
-
-    /// <summary>
-    /// Formats a JSON element into a string of name-value pairs.
-    /// </summary>
-    /// <param name="element">The JSON element to format.</param>
-    /// <returns>A string representation of the JSON element's name-value pairs.</returns>
-    string FormatJsonNameValuePairs(JsonElement element)
-    {
-        if (element.ValueKind == JsonValueKind.Object)
-        {
-            List<string> parts = new();
-
-            foreach (JsonProperty property in element.EnumerateObject())
-            {
-                parts.Add($"{property.Name}:{FormatJsonNameValuePairs(property.Value)}");
-            }
-
-            return string.Join(", ", parts);
-        }
-
-        if (element.ValueKind == JsonValueKind.Array)
-        {
-            List<string> parts = new();
-
-            foreach (JsonElement item in element.EnumerateArray())
-            {
-                parts.Add(FormatJsonNameValuePairs(item));
-            }
-
-            return string.Join(", ", parts);
-        }
-
-        return element.GetRawText();
-    }
-
-    /// <summary>
-    /// Creates a correctly capitalised version of the member's name
-    /// </summary>
-    /// <param name="input">The member name to capitalise.</param>
-    /// <returns>The capitalised member name.</returns>
-    string CapitaliseMemberName(string input)
-    {
-        if (string.IsNullOrEmpty(input))
-            return input;
-
-        // Try to find the member name in the MemberNames enum in order to get its correctly capitalised version
-        try
-        {
-            // Return the correctly cased member name
-            return Enum.Parse<MemberNames>(input, true).ToString();
-        }
-        catch
-        {
-            // If the enum parse fails just capitalise the first letter
-            return char.ToUpper(input[0]) + input.Substring(1);
-        }
-    }
-
-    /// <summary>
     /// Renders a directory and its children as a tree structure.
     /// </summary>
     /// <param name="path">The path of the directory to render.</param>
@@ -1245,8 +1255,19 @@
         }
     }
 
+    #endregion
+
+    #region Support code
+
+    /// <summary>
+    /// Sets the status message.
+    /// </summary>
+    /// <param name="message">The status message to set.</param>
     void SetStatus(string message)
     {
         Settings.Status = message;
     }
+
+    #endregion
+
 }
