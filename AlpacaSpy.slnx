@@ -2,6 +2,7 @@
   <Folder Name="/Solution Items/">
     <File Path=".github/copilot-instructions.md" />
     <File Path="docs/requirements.md" />
+    <File Path="README.md" />
   </Folder>
   <Project Path="AlpacaSpy/AlpacaSpy.csproj" />
 </Solution>
