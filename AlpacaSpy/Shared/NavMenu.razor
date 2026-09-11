@@ -10,14 +10,8 @@
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        @if (isSmall)
-        {
-            <a class="navbar-brand" href="">@Globals.APPLICATION_NAME</a>
-        }
-        else
-        {
-            <a class="navbar-brand" style="color:yellow; flex:1; text-align:center;" href="">ASCOM</a>
-        }
+        <a class="navbar-brand nav-brand-small" href="">@Globals.APPLICATION_NAME</a>
+        <a class="navbar-brand nav-brand-wide" style="color:yellow; flex:1; text-align:center;" href="">ASCOM</a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
