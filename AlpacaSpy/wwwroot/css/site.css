@@ -107,6 +107,27 @@ fieldset legend {
     }
 }
 
+.setup-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
+.setup-controls-small {
+    display: none;
+}
+
+@media (max-width: 1023.98px) {
+    .setup-controls-small {
+        display: flex;
+    }
+
+    .setup-controls-wide {
+        display: none;
+    }
+}
+
 /* Override Radzen dropdown CSS custom properties */
 :root {
     --rz-dropdown-item-hover-background-color: #fcfcfc;
