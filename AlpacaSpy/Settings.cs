@@ -161,6 +161,10 @@ namespace AlpacaSpy
 
         #region Public properties
 
+        public bool DiscoverIPv4 { get; set; }=true;
+
+        public bool DiscoverIPv6 { get; set; } = false;
+
         public ConsoleVisibility ConsoleAppearance { get; set; } = ConsoleVisibility.Hidden;
 
         public bool UpdateCheck { get; set; } = true;

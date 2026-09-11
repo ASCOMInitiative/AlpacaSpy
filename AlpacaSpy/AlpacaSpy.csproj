@@ -95,9 +95,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ASCOM.Alpaca.Components" Version="4.0.0" />
+    <PackageReference Include="ASCOM.Alpaca.Components" Version="4.1.0-rc.24" />
     <PackageReference Include="ASCOM.Alpaca.Razor" Version="0.6.0-alpha02" />
-    <PackageReference Include="ASCOM.Tools" Version="4.0.0" />
+    <PackageReference Include="ASCOM.Tools" Version="4.1.0-rc.24" />
     <PackageReference Include="Microsoft.OpenApi" Version="3.10.2" />
     <PackageReference Include="Octokit" Version="14.0.0" />
     <PackageReference Include="Radzen.Blazor" Version="11.3.2" />

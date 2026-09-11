@@ -21,31 +21,31 @@
         @if (isSmall)
         {
             <RadzenButton Click="RunDiscoveryAsync"
-            Text="Discover Devices"
-            ButtonStyle="ButtonStyle.Primary"
-            Style="border-radius:20px; text-transform:none;"
-            Disabled="@(_discoveryRunning || state.Connected)" />
+                          Text="Discover Devices"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Style="border-radius:20px; text-transform:none;"
+                          Disabled="@(_discoveryRunning || state.Connected)" />
 
             <span>@state.StatusText</span>
 
             <div style="margin-left:auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
                 <RadzenButton Click="ClearDiscoveredDevicesAsync"
-                Text="Clear Devices"
-                ButtonStyle="ButtonStyle.Warning"
-                Style="border-radius:20px; text-transform:none;"
-                Disabled="@(_discoveryRunning)" />
+                              Text="Clear Devices"
+                              ButtonStyle="ButtonStyle.Warning"
+                              Style="border-radius:20px; text-transform:none;"
+                              Disabled="@(_discoveryRunning)" />
 
                 <RadzenButton Click="DeleteAllConfiguredDevicesAsync"
-                Text="Delete Devices"
-                ButtonStyle="ButtonStyle.Danger"
-                Style="border-radius:20px; text-transform:none;"
-                Disabled="@(_discoveryRunning || state.Connected)" />
+                              Text="Delete Devices"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Style="border-radius:20px; text-transform:none;"
+                              Disabled="@(_discoveryRunning || state.Connected)" />
 
                 <RadzenButton Click="ResetSettingsAsync"
-                Text="Reset All"
-                ButtonStyle="ButtonStyle.Danger"
-                Style="border-radius:20px; text-transform:none;"
-                Disabled="@(_discoveryRunning || state.Connected)" />
+                              Text="Reset All"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Style="border-radius:20px; text-transform:none;"
+                              Disabled="@(_discoveryRunning || state.Connected)" />
             </div>
         }
         else
@@ -154,16 +154,6 @@
                     <label>Start browser on launch</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <label style="width:160px;">Discovery duration:</label>
-                    <RadzenNumeric TValue="double"
-                                   Value="@settings.AlpacaDiscoveryDuration"
-                                   ValueChanged="@(async (double v) => { settings.AlpacaDiscoveryDuration = v; await SaveSettings(); })"
-                                   Min="1"
-                                   Disabled="@state.Connected"
-                                   Style="width:100px;" />
-                    <label>(Seconds)</label>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">HTTP Get timeout:</label>
                     <RadzenNumeric TValue="int"
                                    Value="@settings.AlpacaGetPropertyTimeout"
@@ -192,22 +182,6 @@
                     <label>Bind to all network addresses (Un-check to bind to localhost only.)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <RadzenCheckBox TValue="bool"
-                                    Value="@settings.AllowDiscovery"
-                                    ValueChanged="@(async (bool v) => { settings.AllowDiscovery = v; await SaveSettings(); })"
-                                    Disabled="@state.Connected"
-                                    Name="allowDiscovery" />
-                    <label>Allow discovery of @Globals.APPLICATION_SHORT_NAME devices.</label>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <RadzenCheckBox TValue="bool"
-                                    Value="@settings.SendDiscoveryResponsesOnAllNetworks"
-                                    ValueChanged="@(async (bool v) => { settings.SendDiscoveryResponsesOnAllNetworks = v; await SaveSettings(); })"
-                                    Disabled="@(state.Connected || !settings.AllowDiscovery)"
-                                    Name="sendDiscoveryResponsesOnAllNetworks" />
-                    <label style="min-width:750px;">Send discovery responses on all network connections. (Un-check to respond only on localhost.)</label>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Transaction records:</label>
                     <RadzenNumeric TValue="int"
                                    Value="@settings.MaximumRecordingFileEntries"
@@ -227,6 +201,53 @@
                                     Disabled="@state.Connected"
                                     Change="@(() => SaveSettings())" />
                 </div>
+
+                <h4 style="color:cornflowerblue">Configure discovery of Alpaca devices that can be proxied</h4>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.DiscoverIPv4"
+                                    ValueChanged="@(async (bool v) => { settings.DiscoverIPv4 = v; await SaveSettings(false); })"
+                                    Disabled="@state.Connected"
+                                    Name="discoverIPv4" />
+                    <label>Search for IPv4 devices</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.DiscoverIPv6"
+                                    ValueChanged="@(async (bool v) => { settings.DiscoverIPv6 = v; await SaveSettings(false); })"
+                                    Disabled="@state.Connected"
+                                    Name="discoverIPv6" />
+                    <label>Search for IPv6 devices</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="width:160px;">Discovery duration:</label>
+                    <RadzenNumeric TValue="double"
+                                   Value="@settings.AlpacaDiscoveryDuration"
+                                   ValueChanged="@(async (double v) => { settings.AlpacaDiscoveryDuration = v; await SaveSettings(); })"
+                                   Min="1"
+                                   Disabled="@state.Connected"
+                                   Style="width:100px;" />
+                    <label>(Seconds)</label>
+                </div>
+
+                <h4 style="color:cornflowerblue">Configure @Globals.APPLICATION_SHORT_NAME responses to discovery requests from clients</h4>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.AllowDiscovery"
+                                    ValueChanged="@(async (bool v) => { settings.AllowDiscovery = v; await SaveSettings(); })"
+                                    Disabled="@state.Connected"
+                                    Name="allowDiscovery" />
+                    <label>Allow discovery of @Globals.APPLICATION_SHORT_NAME proxy devices.</label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.SendDiscoveryResponsesOnAllNetworks"
+                                    ValueChanged="@(async (bool v) => { settings.SendDiscoveryResponsesOnAllNetworks = v; await SaveSettings(); })"
+                                    Disabled="@(state.Connected || !settings.AllowDiscovery)"
+                                    Name="sendDiscoveryResponsesOnAllNetworks" />
+                    <label style="min-width:750px;">Send discovery responses on all network connections. (Un-check to respond only on localhost.)</label>
+                </div>
+
                 <h4 style="color:cornflowerblue">Debug</h4>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Logging Level:</label>
@@ -260,11 +281,7 @@
                                     Disabled="@state.Connected"
                                     Name="runInStrictAlpacaMode" />
                     <label style="min-width:750px;">Run in Alpaca strict casing mode. (Devices that fail when this is checked are not Alpaca compliant.)</label>
-                </div>
-
-            
-            
-            
+                </div>         
             </div>
         </RadzenTabsItem>
 
@@ -424,7 +441,7 @@
 </RadzenTabs>
 
 @code {
-    private bool isSmall = true;
+    private bool isSmall = false;
     private bool _discoveryRunning;
     private readonly LogLevel[] _logLevels = Enum.GetValues<LogLevel>();
     private readonly ConsoleVisibility[] _consoleAppearancees = Enum.GetValues<ConsoleVisibility>();
@@ -436,6 +453,8 @@
         state.StateChanged += OnStateChanged;
         settings.ConfigurationChanged += OnStateChanged;
         state.StatusText = ""; // Clear status text on entry.
+        isSmall= Globals.IsSmall(Ui.Width, 20000);
+
     }
 
     private async void HandleResize()
@@ -457,7 +476,7 @@
         try
         {
             // Get a list of devices that are available on the network
-            List<AscomDevice> devices = await AlpacaDiscovery.GetAscomDevicesAsync(null, 1, 100, 32227, settings.AlpacaDiscoveryDuration, false, true, false, ServiceType.Http, settings.LogLevel < LogLevel.Information ? logger : null, CancellationToken.None);
+            List<AscomDevice> devices = await AlpacaDiscovery.GetAscomDevicesAsync(null, 1, 100, 32227, settings.AlpacaDiscoveryDuration, false, settings.DiscoverIPv4, settings.DiscoverIPv6, ServiceType.Http, settings.LogLevel < LogLevel.Information ? logger : null, CancellationToken.None);
 
             // Remove our own AlpacaSpy devices from the list, we don't want to proxy ourselves!
             devices.RemoveAll(d => d.AscomDeviceName.StartsWith(Globals.APPLICATION_SHORT_NAME));
@@ -614,10 +633,10 @@
         state.StatusText = $"Removed {device.Name}. Restart required for changes to take effect.";
     }
 
-    private async Task SaveSettings()
+    private async Task SaveSettings(bool restart = true)
     {
         settings.Save();
-        state.DisplayRestartMessage = true;
+        state.DisplayRestartMessage = restart;
         state.StatusText = $"Settings saved at {DateTime.Now:HH:mm:ss}.";
         await InvokeAsync(StateHasChanged);
     }
