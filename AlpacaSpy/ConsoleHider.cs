@@ -4,10 +4,10 @@ using System.Runtime.InteropServices;
 public static class ConsoleHider
 {
     [DllImport("kernel32.dll")]
-    static extern bool AllocConsole();
+    private static extern bool AllocConsole();
 
     [DllImport("kernel32.dll")]
-    static extern bool FreeConsole();
+    private static extern bool FreeConsole();
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetConsoleWindow();
@@ -18,33 +18,52 @@ public static class ConsoleHider
     private const int SW_HIDE = 0;
     private const int SW_MINIMIZE = 6;
     private const int SW_SHOWNORMAL = 1;
+
     public static void MinimizeConsoleWindow()
     {
+        if (!OperatingSystem.IsWindows())
+            return;
+
         IntPtr handle = GetConsoleWindow();
+
         if (handle != IntPtr.Zero)
             ShowWindow(handle, SW_MINIMIZE);
     }
 
     public static void HideConsoleWindow()
     {
+        if (!OperatingSystem.IsWindows())
+            return;
+
         IntPtr handle = GetConsoleWindow();
+
         if (handle != IntPtr.Zero)
             ShowWindow(handle, SW_HIDE);
     }
 
     public static void HideConsoleCompletely()
     {
-        FreeConsole(); // detaches and destroys the console window
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        FreeConsole();
     }
 
     public static void CreateConsoleWindow()
     {
-        AllocConsole(); // allocates a new console window
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        AllocConsole();
     }
 
     public static void ShowConsoleWindow()
     {
+        if (!OperatingSystem.IsWindows())
+            return;
+
         IntPtr handle = GetConsoleWindow();
+
         if (handle != IntPtr.Zero)
             ShowWindow(handle, SW_SHOWNORMAL);
     }

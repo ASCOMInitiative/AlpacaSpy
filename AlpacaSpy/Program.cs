@@ -3,6 +3,7 @@ using ASCOM.Alpaca;
 using ASCOM.Common;
 using ASCOM.Tools;
 using Microsoft.AspNetCore.Components.Server.Circuits;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Radzen;
 using System.Data;
 using System.Diagnostics;
@@ -29,23 +30,27 @@ namespace AlpacaSpy
 
         public static async Task Main(string[] args)
         {
-            // Set the required type of console window
-            switch (settings.ConsoleAppearance)
+            // Set the required type of console window on Windows only.
+            // Linux does not provide kernel32.dll or user32.dll.
+            if (OperatingSystem.IsWindows())
             {
-                case ConsoleVisibility.Minimized:
-                    ConsoleHider.MinimizeConsoleWindow();
-                    break;
+                switch (settings.ConsoleAppearance)
+                {
+                    case ConsoleVisibility.Minimized:
+                        ConsoleHider.MinimizeConsoleWindow();
+                        break;
 
-                case ConsoleVisibility.Hidden:
-                    ConsoleHider.HideConsoleWindow();
-                    break;
+                    case ConsoleVisibility.Hidden:
+                        ConsoleHider.HideConsoleWindow();
+                        break;
 
-                case ConsoleVisibility.Normal:
-                    // Do nothing, leave the console window as is
-                    break;
+                    case ConsoleVisibility.Normal:
+                        // Do nothing, leave the console window as is
+                        break;
 
-                default:
-                    throw new ASCOM.InvalidValueException("Invalid console appearance value.");
+                    default:
+                        throw new ASCOM.InvalidValueException("Invalid console appearance value.");
+                }
             }
 
             ServerVersion = state.ApplicationVersion;
@@ -104,8 +109,18 @@ namespace AlpacaSpy
 
                 if (!(args?.Any(str => str.Contains("--urls")) ?? false))
                 {
-                    string host = settings.BindToAllNetworkAddresses ? "*" : "localhost";
-                    builder.WebHost.UseUrls($"http://{host}:{settings.ServerPort}");
+                    string[] hostStrings;
+
+                    if (settings.BindToAllNetworkAddresses)
+                        hostStrings = new string[] { $"http://*:{settings.ServerPort}" };
+                    else
+                        hostStrings = new string[]
+                        {
+                            //$"localhost:{settings.ServerPort}"
+                             $"http://[::1]:{settings.ServerPort}"
+                        };
+
+                    builder.WebHost.UseUrls(hostStrings);
                 }
 
                 builder.Logging.ClearProviders();
@@ -153,7 +168,6 @@ namespace AlpacaSpy
                 if (!app.Environment.IsDevelopment())
                     app.UseExceptionHandler("/Error");
 
-                ASCOM.Alpaca.Razor.StartupHelpers.ConfigureDiscovery(app);
                 ASCOM.Alpaca.Razor.StartupHelpers.ConfigureAuthentication(app);
 
                 app.UseStaticFiles();
@@ -169,6 +183,12 @@ namespace AlpacaSpy
                 applicationLifetime = app.Lifetime;
                 applicationLifetime.ApplicationStarted.Register(() =>
                 {
+                    ASCOM.Alpaca.Razor.StartupHelpers.ConfigureDiscovery(app);
+                    //IApplicationBuilder applicationBuilder = app;
+                    //IServerAddressesFeature? serverAddressesFeature = applicationBuilder.ServerFeatures.Get<IServerAddressesFeature>();
+                    //string[] addresses = serverAddressesFeature?.Addresses.ToArray() ?? Array.Empty<string>();
+                    //logger.LogMessage(nameof(Main), $"Server Addresses: {string.Join(", ", addresses)}, Address count: {addresses.Length}");
+
                     if (settings.StartBrowserOnLaunch && !(args?.Any(str => str.Contains("--nobrowser")) ?? false))
                     {
                         Task.Run(() => StartBrowserWhenReadyAsync(settings.ServerPort));
