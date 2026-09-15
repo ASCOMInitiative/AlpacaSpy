@@ -130,7 +130,7 @@
                                    Max="65535"
                                    Change="@(async () => await SaveSettings())"
                                    Disabled="@state.Connected"
-                                   Style="width:100px;" />
+                                   Style="width:90px;" />
                     <label>(Default 32325.)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -156,7 +156,7 @@
                                    ValueChanged="@(async (int v) => { settings.AlpacaGetPropertyTimeout = v; await SaveSettings(); })"
                                    Min="1"
                                    Disabled="@state.Connected"
-                                   Style="width:100px;" />
+                                   Style="width:90px;" />
                     <label>(Seconds)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -166,16 +166,8 @@
                                    ValueChanged="@(async (int v) => { settings.AlpacaConnectTimeout = v; await SaveSettings(); })"
                                    Min="1"
                                    Disabled="@state.Connected"
-                                   Style="width:100px;" />
+                                   Style="width:90px;" />
                     <label>(Seconds)</label>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <RadzenCheckBox TValue="bool"
-                                    Value="@settings.BindToAllNetworkAddresses"
-                                    ValueChanged="@(async (bool v) => { settings.BindToAllNetworkAddresses = v; await SaveSettings(); })"
-                                    Disabled="@state.Connected"
-                                    Name="bindToAllNetworkAddresses" />
-                    <label>Bind to all network addresses (Un-check to bind to localhost only.)</label>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Transaction records:</label>
@@ -185,7 +177,7 @@
                                    Min="10"
                                    Disabled="@state.Connected"
                                    Format="N0"
-                                   Style="width:100px;" />
+                                   Style="min-width:90px;max-width:90px;" />
                     <span>Maximum number of recorded transactions per device (Default 100,000).</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -193,7 +185,7 @@
                     <RadzenDropDown TValue="ConsoleVisibility"
                                     Data="@_consoleAppearancees"
                                     @bind-Value="settings.ConsoleAppearance"
-                                    Style="width:180px;"
+                                    Style="min-width:90px;max-width:90px;"
                                     Disabled="@state.Connected"
                                     Change="@(() => SaveSettings())" />
                 </div>
@@ -222,7 +214,7 @@
                                    ValueChanged="@(async (double v) => { settings.AlpacaDiscoveryDuration = v; await SaveSettings(); })"
                                    Min="1"
                                    Disabled="@state.Connected"
-                                   Style="width:100px;" />
+                                   Style="width:90px;" />
                     <label>(Seconds)</label>
                 </div>
 
@@ -243,6 +235,14 @@
                                     Name="sendDiscoveryResponsesOnAllNetworks" />
                     <label style="min-width:750px;">Send discovery responses on all network connections. (Un-check to respond only on localhost.)</label>
                 </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <RadzenCheckBox TValue="bool"
+                                    Value="@settings.BindToAllNetworkAddresses"
+                                    ValueChanged="@(async (bool v) => { settings.BindToAllNetworkAddresses = v; await SaveSettings(); })"
+                                    Disabled="@state.Connected"
+                                    Name="bindToAllNetworkAddresses" />
+                    <label>Connect proxy devices to all network addresses (Un-check to connect to localhost only.)</label>
+                </div>
 
                 <h4 style="color:cornflowerblue">Debug</h4>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -250,7 +250,7 @@
                     <RadzenDropDown TValue="ASCOM.Common.Interfaces.LogLevel"
                                     Data="@_logLevels"
                                     @bind-Value="settings.LogLevel"
-                                    Style="width:180px;"
+                                    Style="width:120px;"
                                     Disabled="@state.Connected"
                                     Change="@(() => SaveSettings())" />
                 </div>
@@ -277,7 +277,7 @@
                                     Disabled="@state.Connected"
                                     Name="runInStrictAlpacaMode" />
                     <label style="min-width:750px;">Run in Alpaca strict casing mode. (Devices that fail when this is checked are not Alpaca compliant.)</label>
-                </div>         
+                </div>
             </div>
         </RadzenTabsItem>
 
