@@ -181,7 +181,7 @@ namespace AlpacaSpy
 
         public bool AutoConnect { get; set; } = true;
 
-        public int AlpacaConnectTimeout { get; set; } = 10;
+        public int AlpacaConnectTimeout { get; set; } = 2;
 
         public bool IncludeAlpacaTrace { get; set; } = false;
 
