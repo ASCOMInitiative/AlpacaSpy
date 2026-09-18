@@ -182,12 +182,19 @@
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <label style="width:160px;">Console Appearance:</label>
-                    <RadzenDropDown TValue="ConsoleVisibility"
-                                    Data="@_consoleAppearancees"
-                                    @bind-Value="settings.ConsoleAppearance"
-                                    Style="min-width:90px;max-width:90px;"
-                                    Disabled="@state.Connected"
-                                    Change="@(() => SaveSettings())" />
+                    @if (OperatingSystem.IsWindows())
+                    {
+                        <RadzenDropDown TValue="ConsoleVisibility"
+                                        Data="@_consoleAppearancees"
+                                        @bind-Value="settings.ConsoleAppearance"
+                                        Style="min-width:90px;max-width:90px;"
+                                        Disabled="@state.Connected"
+                                        Change="@(() => SaveSettings())" />
+                    }
+                    else
+                    {
+                        <label>Windows only</label>
+                    }
                 </div>
 
                 <h4 style="color:cornflowerblue">Configure discovery of Alpaca devices that can be proxied</h4>
