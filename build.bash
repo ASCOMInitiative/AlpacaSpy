@@ -73,8 +73,8 @@ for RID in "${RIDS[@]}"; do
         -c Release \
         -r "$RID" \
         --self-contained true \
-        -p:PublishTrimmed=false \
         -p:PublishSingleFile=true \
+        -p:PublishReadyToRun=true \
         -p:PublishReadyToRunShowWarnings=true \
         -p:UseAppHost=true \
         -o "$OUTDIR"
