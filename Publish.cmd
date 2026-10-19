@@ -34,7 +34,17 @@ scp -r J:\AlpacaSpy\publish\Temp\AlpacaSpyOsxX64\* petersimpson@macmini:/Users/p
 
 scp -r J:\AlpacaSpy\publish\Temp\AlpacaSpyOsxArm64\* petersimpson@macmini:/Users/petersimpson/builds/AlpacaSpy/source_files/alpacaspy.macos-arm64
 
-ssh -t petersimpson@macmini "sudo /Users/petersimpson/Builds/AlpacaSpy/makespy 0.9.0"
+Rem Extract the full build number from the InformationVersion.txt file.
+set /p FULLVER=<AlpacaSpy\bin\InformationVersion.txt
+
+Rem Extract the version number from the full build number
+for /f "tokens=1 delims=+" %%a in ("%FULLVER%") do (
+    set BASEVER=%%a
+)
+
+echo Version number: %BASEVER%, Build number: %FULLVER%
+
+ssh -t petersimpson@macmini "sudo /Users/petersimpson/Builds/AlpacaSpy/makespy %BASEVER%"
 
 scp petersimpson@macmini:/Users/petersimpson/Builds/AlpacaSpy/dmg_file/* J:\AlpacaSpy\publish
 
