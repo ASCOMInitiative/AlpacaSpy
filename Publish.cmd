@@ -12,8 +12,11 @@ if defined __VCVARSALL_HOST_ARCH (
     call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 )
 
+Rem Build AlpacaSpy so that the InformationVersion,txt file is up to date.
+dotnet build alpacaspy/alpacaspy.csproj -c Debug -p:Platform="Any CPU" --framework net10.0
+
 Rem Extract the full build number from the InformationVersion.txt file.
-set /p FULL_VERSION=<AlpacaSpy\bin\InformationVersion.txt
+set /p FULL_VERSION=<"AlpacaSpy\bin\Any CPU\Debug\net10.0\InformationVersion.txt"
 
 Rem Extract the version number from the full build number
 for /f "tokens=1 delims=+" %%a in ("%FULL_VERSION%") do (
