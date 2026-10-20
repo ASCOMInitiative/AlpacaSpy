@@ -2,6 +2,17 @@
 set -e
 
 # ------------------------------
+# VALIDATE THE SUPPLIED BUILD VERSION
+# ------------------------------
+param="$1"
+if [[ "$param" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Valid version supplied: $param"
+else
+    echo "Invalid version supplied, script ending: $1"
+    exit 1
+fi
+
+# ------------------------------
 # CONSTANTS
 # ------------------------------
 HOME="/home/peter" # Root folder on the WSL file system
@@ -66,7 +77,7 @@ for RID in "${RIDS[@]}"; do
     echo "Publish folder: $OUTDIR"    
     mkdir "$OUTDIR"
     
-    TARFILE="$PUBLISHWORKFOLDER/$APPLICATIONNAME.$RID.tar.xz"
+    TARFILE="$PUBLISHWORKFOLDER/$APPLICATIONNAME.$1.$RID.tar.xz"
     echo "Tar file: $TARFILE"    
     
     dotnet publish "$PROJECT" \

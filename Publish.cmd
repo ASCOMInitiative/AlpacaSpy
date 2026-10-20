@@ -12,11 +12,21 @@ if defined __VCVARSALL_HOST_ARCH (
     call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 )
 
+Rem Extract the full build number from the InformationVersion.txt file.
+set /p FULL_VERSION=<AlpacaSpy\bin\InformationVersion.txt
+
+Rem Extract the version number from the full build number
+for /f "tokens=1 delims=+" %%a in ("%FULL_VERSION%") do (
+    set BUILD_VERSION=%%a
+)
+
+echo Version number: %BUILD_VERSION%, Build number: %FULL_VERSION%
+
 cd
 cd J:\AlpacaSpy
 
 echo *** Publishing Linux builds
-wsl -e bash -lc "/mnt/j/AlpacaSpy/build.bash"
+wsl -e bash -lc "/mnt/j/AlpacaSpy/build.bash %BUILD_VERSION%"
 
 echo *** Publishing MacOS Intel silicon
 dotnet publish AlpacaSpy/AlpacaSpy.csproj -c Debug -p:Platform="Any CPU" -r osx-x64  --framework net10.0 --self-contained true /p:PublishTrimmed=false -p:PublishSingleFile=true -o ./publish/Temp/AlpacaSpyOsxX64/
@@ -34,17 +44,7 @@ scp -r J:\AlpacaSpy\publish\Temp\AlpacaSpyOsxX64\* petersimpson@macmini:/Users/p
 
 scp -r J:\AlpacaSpy\publish\Temp\AlpacaSpyOsxArm64\* petersimpson@macmini:/Users/petersimpson/builds/AlpacaSpy/source_files/alpacaspy.macos-arm64
 
-Rem Extract the full build number from the InformationVersion.txt file.
-set /p FULLVER=<AlpacaSpy\bin\InformationVersion.txt
-
-Rem Extract the version number from the full build number
-for /f "tokens=1 delims=+" %%a in ("%FULLVER%") do (
-    set BASEVER=%%a
-)
-
-echo Version number: %BASEVER%, Build number: %FULLVER%
-
-ssh -t petersimpson@macmini "sudo /Users/petersimpson/Builds/AlpacaSpy/makespy %BASEVER%"
+ssh -t petersimpson@macmini "sudo /Users/petersimpson/Builds/AlpacaSpy/makespy %BUILD_VERSION%"
 
 scp petersimpson@macmini:/Users/petersimpson/Builds/AlpacaSpy/dmg_file/* J:\AlpacaSpy\publish
 
